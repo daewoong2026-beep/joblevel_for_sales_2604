@@ -5275,6 +5275,34 @@ async function uploadFile1() {
       }
     }
 
+    /* ── 별도 면접관 시트가 없는 경우: 메인 시트에서 면접관 추출 (영업 파일 형식) ── */
+    if (!ivSheet) {
+      /* ★본부 다음 ~ 현직무 이전에 있는 연속 '사번','성명' 쌍을 면접관 컬럼으로 인식 */
+      const bonbuIdx = hdr.findIndex(h => h && String(h).includes('★본부'));
+      const curJobIdx = col('현직무');
+      if (bonbuIdx >= 0 && curJobIdx > bonbuIdx) {
+        const ivStartCol = bonbuIdx + 1;
+        const ivEndCol = curJobIdx;
+        /* 데이터 행에서 면접관 추출 */
+        for (let i = hdrIdx + 1; i < raw.length; i++) {
+          const r = raw[i];
+          const empSabun = String(r[col('사원번호')] || '').trim();
+          if (!empSabun || !/^\d+$/.test(empSabun)) continue;
+          for (let j = ivStartCol; j < ivEndCol; j += 2) {
+            const ivSab = String(r[j] || '').trim();
+            const ivNm = String(r[j+1] || '').trim();
+            if (!ivSab || !/^\d+$/.test(ivSab) || !ivNm) continue;
+            if (!INTERVIEWER_MAP[ivSab]) {
+              INTERVIEWER_MAP[ivSab] = { name: ivNm, sabuns: [] };
+            }
+            if (!INTERVIEWER_MAP[ivSab].sabuns.includes(empSabun)) {
+              INTERVIEWER_MAP[ivSab].sabuns.push(empSabun);
+            }
+          }
+        }
+      }
+    }
+
     /* ── 면접관 정보도 DB에 저장 ── */
     await saveInterviewersToDB();
 
