@@ -5158,7 +5158,8 @@ async function uploadFile1() {
       const ivHdrIdx = ivRaw.findIndex(row => row.some(c => c && String(c).includes('본부')));
       for (let i = (ivHdrIdx >= 0 ? ivHdrIdx + 1 : 2); i < ivRaw.length; i++) {
         const row = ivRaw[i];
-        for (let j = 1; j < row.length; j += 2) {
+        /* col 구조: 0=빈칸, 1=★본부, 2=사번1, 3=성명1, 4=사번2, 5=성명2, ... */
+        for (let j = 2; j < row.length; j += 2) {
           const ivSabun = String(row[j] || '').trim();
           const ivName = String(row[j+1] || '').trim();
           if (ivSabun && ivName && /^\d+$/.test(ivSabun) && !INTERVIEWER_MAP[ivSabun]) {
