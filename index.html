@@ -1358,8 +1358,7 @@ input, textarea, select, button { font-family: var(--font-main) !important; }
 @media (min-width:1600px) { :root{--sidebar-w:300px} .review-wrap{padding:36px 48px 80px;max-width:1200px} .main-content{display:flex;justify-content:center} }
 </style>
 
-    <!-- ★ Supabase SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- ★ Supabase REST API (SDK 제거 — 직접 fetch 사용) -->
 </head>
 <body>
 
@@ -2149,6 +2148,11 @@ input, textarea, select, button { font-family: var(--font-main) !important; }
           • 파일 ① 업로드 시 면접관 리스트와 매핑이 자동으로 갱신됩니다<br>
           • 여기서 직접 수정한 내용도 즉시 DB에 반영됩니다
         </div>
+        <div id="iv-db-status" style="margin-top:12px;font-size:0.75rem;color:var(--g400)"></div>
+        <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:12px">
+          <button class="btn-admin" onclick="testInterviewerDB()" style="padding:8px 16px;font-size:0.8rem">🔍 DB 연결 확인</button>
+          <button class="btn-admin btn-admin-primary" onclick="forceSaveInterviewers()" style="padding:8px 16px;font-size:0.8rem">💾 면접관 DB 저장</button>
+        </div>
       </div>
 
     </div>
@@ -2585,7 +2589,69 @@ const GAS_URL     = ''; // (deprecated — Supabase로 전환됨)
 ══════════════════════════════════════════════════════════ */
 const SUPABASE_URL  = 'https://wjvxyslydaanstffudtn.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indqdnh5c2x5ZGFhbnN0ZmZ1ZHRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMTE0NjgsImV4cCI6MjA5MDU4NzQ2OH0.4EPCme679Yom1xsIfUG9Dy2-pe-b3DHDrs9BA_1ojow';
-const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+/* ══ Supabase REST API 래퍼 (SDK 없이 fetch 직접 사용) ══ */
+const _sbHeaders = () => ({
+  'apikey': SUPABASE_ANON,
+  'Authorization': 'Bearer ' + SUPABASE_ANON,
+  'Content-Type': 'application/json'
+});
+
+class SbQuery {
+  constructor(table) {
+    this._url = SUPABASE_URL + '/rest/v1/' + table;
+    this._method = 'GET';
+    this._body = null;
+    this._filters = [];
+    this._select = '*';
+    this._limit = null;
+    this._single = false;
+    this._prefer = ['return=representation'];
+  }
+  select(cols, opts) {
+    this._select = cols || '*';
+    if (opts && opts.count) this._prefer.push('count=' + opts.count);
+    return this;
+  }
+  eq(col, val)  { this._filters.push(col + '=eq.' + encodeURIComponent(val)); return this; }
+  neq(col, val) { this._filters.push(col + '=neq.' + encodeURIComponent(val)); return this; }
+  in(col, vals) { this._filters.push(col + '=in.(' + vals.map(v => encodeURIComponent(v)).join(',') + ')'); return this; }
+  limit(n)      { this._limit = n; return this; }
+  single()      { this._single = true; this._limit = 1; return this; }
+  update(data)  { this._method = 'PATCH'; this._body = data; return this; }
+  upsert(data, opts) {
+    this._method = 'POST'; this._body = data;
+    if (opts && opts.onConflict) this._prefer.push('resolution=merge-duplicates');
+    return this;
+  }
+  insert(data)  { this._method = 'POST'; this._body = data; return this; }
+  delete()      { this._method = 'DELETE'; return this; }
+  /* thenable — await 시 자동 실행 */
+  then(resolve, reject) {
+    let url = this._url + '?select=' + encodeURIComponent(this._select);
+    this._filters.forEach(f => { url += '&' + f; });
+    if (this._limit) url += '&limit=' + this._limit;
+    const opts = { method: this._method, headers: { ..._sbHeaders(), 'Prefer': this._prefer.join(',') } };
+    if (this._body && (this._method === 'POST' || this._method === 'PATCH')) {
+      opts.body = JSON.stringify(this._body);
+    }
+    const single = this._single;
+    const p = fetch(url, opts).then(async res => {
+      if (!res.ok) {
+        let msg = ''; try { const j = await res.json(); msg = j.message || j.error || JSON.stringify(j); } catch { msg = res.statusText; }
+        return { data: null, error: { message: msg } };
+      }
+      if (this._method === 'DELETE') return { data: null, error: null };
+      const data = await res.json();
+      return { data: single ? (data[0] || null) : data, error: null };
+    }).catch(err => ({ data: null, error: { message: String(err && err.message || err) } }));
+    return resolve ? p.then(resolve, reject) : p;
+  }
+}
+
+const _sb = {
+  from(table) { return new SbQuery(table); },
+  channel() { return { on() { return this; }, subscribe() { return this; } }; }
+};
 const SYNC_MS     = 60000;
 
 /* ── 샘플 관리자 계정 (추후 전달 시 교체) ── */
@@ -3174,7 +3240,28 @@ async function doLogin() {
   showLoad('데이터를 불러오는 중입니다…');
   try {
     await sleep(400);
-    const entry = INTERVIEWER_MAP[sabun];
+
+    /* ── INTERVIEWER_MAP이 비어있으면 DB에서 다시 로드 ── */
+    if (Object.keys(INTERVIEWER_MAP).length === 0) {
+      await loadInterviewersFromDB();
+    }
+
+    let entry = INTERVIEWER_MAP[sabun];
+
+    /* ── INTERVIEWER_MAP에 없으면 DB에서 직접 조회 시도 ── */
+    if (!entry) {
+      try {
+        const { data } = await _sb.from('interviewers').select('*').eq('sabun', sabun).single();
+        if (data) {
+          INTERVIEWER_MAP[sabun] = {
+            name: data.name,
+            sabuns: Array.isArray(data.candidate_sabuns) ? data.candidate_sabuns : []
+          };
+          entry = INTERVIEWER_MAP[sabun];
+        }
+      } catch(e) { /* DB 조회 실패 시 무시 */ }
+    }
+
     if (!entry) { showErr('등록된 면접관 정보가 없습니다. 사번을 확인해 주세요.'); return; }
     if (entry.name && name.trim() !== entry.name.trim()) {
       showErr('성명이 일치하지 않습니다. 다시 확인해 주세요.');
@@ -3190,10 +3277,10 @@ async function doLogin() {
     /* Supabase에서 데이터 로드 */
     try {
       const { data, error } = await _sb.from('employees').select('*').in('sabun', mySabuns);
-      if (error) throw error;
+      if (error) throw new Error(error.message || 'DB 오류');
       candidates = (data || []).sort((a,b) => a.name.localeCompare(b.name,'ko'));
     } catch(e) {
-      console.warn('Supabase 로드 실패, 로컬 DATA_SAMPLE 사용:', e);
+      console.warn('Supabase 로드 실패, 로컬 DATA_SAMPLE 사용:', String(e?.message||e));
       candidates = DATA_SAMPLE.filter(c => mySabuns.includes(c.sabun))
                                .slice().sort((a,b)=>a.name.localeCompare(b.name,'ko'));
     }
@@ -3235,10 +3322,10 @@ async function doAdminLogin() {
     /* Supabase에서 전체 데이터 로드 */
     try {
       const { data, error } = await _sb.from('employees').select('*');
-      if (error) throw error;
+      if (error) throw new Error(error.message || 'DB 오류');
       candidates = (data || []).sort((a,b) => a.name.localeCompare(b.name,'ko'));
     } catch(e) {
-      console.warn('Supabase 로드 실패, 로컬 DATA_SAMPLE 사용:', e);
+      console.warn('Supabase 로드 실패, 로컬 DATA_SAMPLE 사용:', String(e?.message||e));
       candidates = DATA_SAMPLE.slice().sort((a,b)=>a.name.localeCompare(b.name,'ko'));
     }
     setText('admin-user-name', adminUser.id);
@@ -3323,7 +3410,7 @@ function startAutoSync(code) {
         await refreshCandidates(code);
       })
       .subscribe();
-  } catch(e) { console.warn('Realtime 구독 실패, polling 모드로 전환', e); }
+  } catch(e) { console.warn('Realtime 구독 실패, polling 모드로 전환', String(e?.message||e)); }
 
   /* ── Polling 백업 (Realtime 연결 불안정 시 대비) ── */
   syncTimer = setInterval(async () => {
@@ -3335,7 +3422,7 @@ function startAutoSync(code) {
 async function refreshCandidates(filterCode) {
   try {
     const { data, error } = await _sb.from('employees').select('*');
-    if (error) throw error;
+    if (error) throw new Error(error.message || 'DB 오류');
     if (data && data.length > 0) {
       /* 면접관 로그인 시 본인 담당 사번만 필터 */
       if (user && !adminUser) {
@@ -3354,7 +3441,7 @@ async function refreshCandidates(filterCode) {
       if (curPage === 'review' && curIdx >= 0 && curIdx < candidates.length) renderCandidate(curIdx);
       if (curPage === 'admin') { renderAdminList(); }
     }
-  } catch(e) { console.warn('Supabase 동기화 실패:', e); }
+  } catch(e) { console.warn('Supabase 동기화 실패:', String(e?.message||e)); }
 }
 
 /* ══════════════════════════════════════════════
@@ -4404,8 +4491,8 @@ async function saveAdminInfo(){
   try {
     const updateFields = JSON.parse(payload);
     const { error } = await _sb.from('employees').update(updateFields).eq('sabun', c.sabun);
-    if (error) throw error;
-  } catch(e) { console.warn('Supabase saveCandidateInfo 실패', e); }
+    if (error) throw new Error(error.message || 'DB 오류');
+  } catch(e) { console.warn('Supabase saveCandidateInfo 실패', String(e?.message||e)); }
   // 드롭다운 텍스트 갱신
   ['admin-cand-sel-info','admin-cand-sel-app','admin-cand-sel-map'].forEach(id=>{
     const el=$(id); if(!el) return;
@@ -4439,8 +4526,8 @@ async function saveAdminApp(){
   /* ① Supabase에 저장 → Realtime으로 모든 클라이언트 반영 */
   try {
     const { error } = await _sb.from('employees').update({ application: newApp }).eq('sabun', c.sabun);
-    if (error) throw error;
-  } catch(e) { console.warn('Supabase saveApp 실패', e); }
+    if (error) throw new Error(error.message || 'DB 오류');
+  } catch(e) { console.warn('Supabase saveApp 실패', String(e?.message||e)); }
 
   /* ② 현재 열린 심의 화면 즉시 갱신 */
   if (curPage === 'review') {
@@ -4489,8 +4576,8 @@ async function saveAdminMap(){
   c.interviews=[...rows].map((_,i)=>({interviewer:$(`iv-name-${i}`)?.value||'',result:$(`iv-result-${i}`)?.value||'',comment:$(`iv-comment-${i}`)?.value||''})).filter(iv=>iv.interviewer);
   try {
     const { error } = await _sb.from('employees').update({ interviews: c.interviews }).eq('sabun', c.sabun);
-    if (error) throw error;
-  } catch(e) { console.warn('Supabase saveMap 실패', e); }
+    if (error) throw new Error(error.message || 'DB 오류');
+  } catch(e) { console.warn('Supabase saveMap 실패', String(e?.message||e)); }
   showAdminToast('✅ 면접관 맵핑이 저장되었습니다');
   if (curPage === 'review' && candidates[curIdx]?.sabun === c.sabun) renderCandidate(curIdx);
 }
@@ -4517,9 +4604,9 @@ async function saveAuthCodes(){
     await _sb.from('auth_codes').delete().neq('id', 0); // 전체 삭제
     if (_authCodes.length > 0) {
       const { error } = await _sb.from('auth_codes').insert(_authCodes);
-      if (error) throw error;
+      if (error) throw new Error(error.message || 'DB 오류');
     }
-  } catch(e) { console.warn('Supabase saveAuth 실패', e); }
+  } catch(e) { console.warn('Supabase saveAuth 실패', String(e?.message||e)); }
   renderAuthTable(); showAdminToast('✅ 인증코드가 저장되었습니다');
 }
 function showAdminToast(msg){const t=$('admin-toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
@@ -5146,7 +5233,7 @@ async function uploadFile1() {
     for (let i = 0; i < employees.length; i += 50) {
       const batch = employees.slice(i, i + 50);
       const { error } = await _sb.from('employees').upsert(batch, { onConflict:'sabun' });
-      if (error) throw error;
+      if (error) throw new Error(error.message || 'DB 오류');
     }
 
     /* ── 시트2: 면접관 리스트 → INTERVIEWER_MAP 갱신 ── */
@@ -5195,7 +5282,7 @@ async function uploadFile1() {
     fi.value = '';
     await refreshFromSupabase();
   } catch(e) {
-    console.error('파일 ① 업로드 실패:', e);
+    console.error('파일 ① 업로드 실패:', String(e?.message||e));
     st.innerHTML = `<span style="color:#dc2626">❌ 실패: ${e.message || e}</span>`;
   } finally { hideLoad(); }
 }
@@ -5284,7 +5371,7 @@ async function uploadFile2() {
     fi.value = '';
     await refreshFromSupabase();
   } catch(e) {
-    console.error('파일 ② 업로드 실패:', e);
+    console.error('파일 ② 업로드 실패:', String(e?.message||e));
     st.innerHTML = `<span style="color:#dc2626">❌ 실패: ${e.message || e}</span>`;
   } finally { hideLoad(); }
 }
@@ -5393,7 +5480,7 @@ async function uploadFile3() {
     fi.value = '';
     await refreshFromSupabase();
   } catch(e) {
-    console.error('파일 ③ 업로드 실패:', e);
+    console.error('파일 ③ 업로드 실패:', String(e?.message||e));
     st.innerHTML = `<span style="color:#dc2626">❌ 실패: ${e.message || e}</span>`;
   } finally { hideLoad(); }
 }
@@ -5402,18 +5489,18 @@ async function uploadFile3() {
 async function refreshFromSupabase() {
   try {
     const { data, error } = await _sb.from('employees').select('*');
-    if (error) throw error;
+    if (error) throw new Error(error.message || 'DB 오류');
     candidates = (data || []).sort((a,b) => a.name.localeCompare(b.name, 'ko'));
     if (typeof renderAdminList === 'function') renderAdminList();
     console.log(`✅ DB 새로고침: ${candidates.length}명 로드`);
-  } catch(e) { console.warn('DB 새로고침 실패:', e); }
+  } catch(e) { console.warn('DB 새로고침 실패:', String(e?.message||e)); }
 }
 
 /* ── Supabase 연결 상태 확인 ── */
 async function checkSupabaseConnection() {
   try {
     const { data, error } = await _sb.from('employees').select('sabun').limit(1);
-    if (error) throw error;
+    if (error) throw new Error(error.message || 'DB 오류');
     console.log('✅ Supabase 연결 성공');
     return true;
   } catch(e) {
@@ -5467,7 +5554,7 @@ function printSchemaGuide() {
 async function loadInterviewersFromDB() {
   try {
     const { data, error } = await _sb.from('interviewers').select('*');
-    if (error) throw error;
+    if (error) throw new Error(error.message || 'DB 오류');
     if (data && data.length > 0) {
       data.forEach(iv => {
         INTERVIEWER_MAP[iv.sabun] = {
@@ -5475,9 +5562,15 @@ async function loadInterviewersFromDB() {
           sabuns: Array.isArray(iv.candidate_sabuns) ? iv.candidate_sabuns : []
         };
       });
-      console.log(`✅ 면접관 ${data.length}명 로드 완료`);
+      console.log(`✅ 면접관 ${data.length}명 DB에서 로드 완료 (INTERVIEWER_MAP: ${Object.keys(INTERVIEWER_MAP).length}명)`);
+    } else {
+      console.log('ℹ️ interviewers 테이블에 데이터 없음');
     }
-  } catch(e) { console.warn('면접관 로드 실패:', e); }
+    return true;
+  } catch(e) {
+    console.error('❌ 면접관 로드 실패:', String(e?.message||e));
+    return false;
+  }
 }
 
 /* ── 면접관 데이터를 DB에 저장 ── */
@@ -5489,10 +5582,19 @@ async function saveInterviewersToDB() {
       candidate_sabuns: info.sabuns || []
     }));
     if (entries.length === 0) return;
-    const { error } = await _sb.from('interviewers').upsert(entries, { onConflict: 'sabun' });
-    if (error) throw error;
+    /* 50건씩 batch 저장 */
+    for (let i = 0; i < entries.length; i += 50) {
+      const batch = entries.slice(i, i + 50);
+      const { error } = await _sb.from('interviewers').upsert(batch, { onConflict: 'sabun' });
+      if (error) throw new Error(error.message || 'DB 오류');
+    }
     console.log(`✅ 면접관 ${entries.length}명 DB 저장 완료`);
-  } catch(e) { console.warn('면접관 DB 저장 실패:', e); }
+    return true;
+  } catch(e) {
+    console.error('면접관 DB 저장 실패:', String(e?.message||e));
+    alert('❌ 면접관 DB 저장 실패: ' + String(e?.message||e));
+    return false;
+  }
 }
 
 /* ── 면접관 관리: 추가 ── */
@@ -5502,7 +5604,8 @@ async function addInterviewer() {
   const name = prompt('면접관 성명을 입력하세요:');
   if (!name || !name.trim()) return;
   INTERVIEWER_MAP[sabun.trim()] = { name: name.trim(), sabuns: [] };
-  await saveInterviewersToDB();
+  const ok = await saveInterviewersToDB();
+  if (ok) showAdminToast('✅ 면접관 추가 완료');
   renderInterviewerAdmin();
 }
 
@@ -5510,7 +5613,11 @@ async function addInterviewer() {
 async function deleteInterviewer(sabun) {
   if (!confirm(`면접관 ${INTERVIEWER_MAP[sabun]?.name||sabun}을(를) 삭제하시겠습니까?`)) return;
   delete INTERVIEWER_MAP[sabun];
-  try { await _sb.from('interviewers').delete().eq('sabun', sabun); } catch(e) {}
+  try {
+    const { error } = await _sb.from('interviewers').delete().eq('sabun', sabun);
+    if (error) throw new Error(error.message || 'DB 오류');
+    showAdminToast('✅ 면접관 삭제 완료');
+  } catch(e) { alert('❌ 삭제 실패: ' + String(e?.message||e)); }
   renderInterviewerAdmin();
 }
 
@@ -5522,7 +5629,8 @@ async function editInterviewerMapping(ivSabun) {
   const input = prompt(`${info.name} 면접관의 담당 지원자 사번을 쉼표로 구분하여 입력하세요:\n\n현재: ${current || '(없음)'}`, current);
   if (input === null) return;
   info.sabuns = input.split(',').map(s => s.trim()).filter(s => s);
-  await saveInterviewersToDB();
+  const ok = await saveInterviewersToDB();
+  if (ok) showAdminToast('✅ 매핑 저장 완료');
   renderInterviewerAdmin();
 }
 
@@ -5531,6 +5639,11 @@ function renderInterviewerAdmin() {
   const el = document.getElementById('iv-admin-list');
   if (!el) return;
   const entries = Object.entries(INTERVIEWER_MAP);
+
+  /* 상태 표시 */
+  const stEl = document.getElementById('iv-db-status');
+  if (stEl) stEl.textContent = `메모리: ${entries.length}명 등록됨`;
+
   if (!entries.length) {
     el.innerHTML = '<div style="text-align:center;color:var(--g400);padding:24px">등록된 면접관이 없습니다.<br>파일 ① 업로드 또는 직접 추가해주세요.</div>';
     return;
@@ -5551,6 +5664,37 @@ function renderInterviewerAdmin() {
         <button onclick="deleteInterviewer('${sab}')" style="font-size:0.7rem;padding:3px 8px;border:1px solid #fca5a5;border-radius:4px;background:#fef2f2;color:#dc2626;cursor:pointer">삭제</button>
       </td>
     </tr>`).join('')}</tbody></table>`;
+}
+
+/* ── 면접관 DB 연결 테스트 ── */
+async function testInterviewerDB() {
+  const stEl = document.getElementById('iv-db-status');
+  try {
+    const { data, error, count } = await _sb.from('interviewers').select('sabun', { count: 'exact' });
+    if (error) throw new Error(error.message || 'DB 오류');
+    const dbCount = data ? data.length : 0;
+    const memCount = Object.keys(INTERVIEWER_MAP).length;
+    const msg = `✅ DB 연결 정상 — DB: ${dbCount}명 / 메모리: ${memCount}명`;
+    if (stEl) stEl.innerHTML = `<span style="color:#16a34a">${msg}</span>`;
+    alert(msg);
+  } catch(e) {
+    const msg = `❌ DB 연결 실패: ${String(e?.message||e)}`;
+    if (stEl) stEl.innerHTML = `<span style="color:#dc2626">${msg}</span>`;
+    alert(msg + '\n\nSupabase SQL Editor에서 interviewers 테이블이 생성되었는지 확인해주세요.');
+  }
+}
+
+/* ── 면접관 강제 DB 저장 ── */
+async function forceSaveInterviewers() {
+  const count = Object.keys(INTERVIEWER_MAP).length;
+  if (!count) { alert('저장할 면접관 데이터가 없습니다.'); return; }
+  showLoad(`면접관 ${count}명 DB 저장 중…`);
+  const ok = await saveInterviewersToDB();
+  hideLoad();
+  if (ok) {
+    alert(`✅ 면접관 ${count}명 DB 저장 완료!`);
+    renderInterviewerAdmin();
+  }
 }
 
 window.addEventListener('DOMContentLoaded', async () => {
