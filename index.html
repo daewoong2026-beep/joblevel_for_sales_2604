@@ -1664,6 +1664,7 @@ input, textarea, select, button { font-family: var(--font-main) !important; }
       <div class="admin-tab-item"        id="atab-insight" onclick="switchAdminPanel('panel-insight',this)">📊 인사이트</div>
       <div class="admin-tab-item"        id="atab-raw"     onclick="switchAdminPanel('panel-raw',this)">📥 로우파일 추출</div>
       <div class="admin-tab-item"        id="atab-upload"  onclick="switchAdminPanel('panel-upload',this)">📤 데이터 업로드</div>
+      <div class="admin-tab-item"        id="atab-iv"      onclick="switchAdminPanel('panel-iv',this);renderInterviewerAdmin()">👤 면접관 관리</div>
     </div>
 
   <div class="admin-shell">
@@ -2128,9 +2129,33 @@ input, textarea, select, button { font-family: var(--font-main) !important; }
         </div>
       </div>
 
+      <!-- ══ 면접관 관리 패널 ══ -->
+      <div id="panel-iv" class="admin-panel">
+        <div class="admin-panel-title">면접관 관리</div>
+        <div class="admin-panel-sub">면접관 로그인 정보와 지원자 매핑을 관리합니다. 파일 ① 업로드 시 자동 반영되며, 여기서 직접 추가/수정/삭제도 가능합니다.</div>
+
+        <div style="background:var(--white);border:1px solid var(--g200);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <div style="font-size:0.875rem;font-weight:700;color:var(--g900)">등록된 면접관 목록</div>
+            <button class="btn-admin btn-admin-primary" onclick="addInterviewer()" style="padding:6px 14px;font-size:0.8rem">➕ 면접관 추가</button>
+          </div>
+          <div id="iv-admin-list"></div>
+        </div>
+
+        <div style="background:var(--g50);border:1px solid var(--g200);border-radius:var(--radius-lg);padding:16px 20px;font-size:0.75rem;color:var(--g500)">
+          <strong>사용법 안내</strong><br>
+          • 면접관은 사번 + 성명으로 로그인합니다<br>
+          • "매핑" 버튼으로 담당 지원자 사번을 쉼표로 구분하여 입력합니다<br>
+          • 파일 ① 업로드 시 면접관 리스트와 매핑이 자동으로 갱신됩니다<br>
+          • 여기서 직접 수정한 내용도 즉시 DB에 반영됩니다
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
+
+<!-- 저장 토스트 -->
 <div class="admin-toast" id="admin-toast">✅ 저장되었습니다</div>
 
 <!-- ════════════════════════════════════════════════
@@ -2880,10 +2905,11 @@ function renderCandidate(idx) {
     </div>`).join('')||'<div class="empty-note">이력 없음</div>';
 
   /* 지원서 */
+  const qLabels = {q1:'1. 상황',q2:'2. 과제',q3:'3. 목표',q4:'4. 전략',q5:'5. 수행내역',q6:'6. 결과 (최종성과)'};
   const appH = c.application && Object.keys(c.application).length
     ? Object.entries(c.application).map(([q,a])=>`
       <div class="app-sec">
-        <div class="app-q">${q}</div>
+        <div class="app-q">${qLabels[q]||q}</div>
         <div class="app-body">${(a||'').split('\n').filter(l=>l.trim()).map(l=>`<p>${l}</p>`).join('')}</div>
       </div>`).join('')
     : '<div class="empty-note">지원서 데이터 없음</div>';
@@ -5161,7 +5187,10 @@ async function uploadFile1() {
       }
     }
 
-    st.innerHTML = `<span style="color:#16a34a">✅ ${employees.length}명 업로드 완료!</span>`;
+    /* ── 면접관 정보도 DB에 저장 ── */
+    await saveInterviewersToDB();
+
+    st.innerHTML = `<span style="color:#16a34a">✅ ${employees.length}명 업로드 + 면접관 ${Object.keys(INTERVIEWER_MAP).length}명 저장 완료!</span>`;
     fi.value = '';
     await refreshFromSupabase();
   } catch(e) {
@@ -5407,11 +5436,102 @@ function printSchemaGuide() {
 }
 
 /* 페이지 로드 시 연결 확인 */
+/* ── Supabase에서 면접관 데이터 로드 → INTERVIEWER_MAP 복원 ── */
+async function loadInterviewersFromDB() {
+  try {
+    const { data, error } = await _sb.from('interviewers').select('*');
+    if (error) throw error;
+    if (data && data.length > 0) {
+      data.forEach(iv => {
+        INTERVIEWER_MAP[iv.sabun] = {
+          name: iv.name,
+          sabuns: Array.isArray(iv.candidate_sabuns) ? iv.candidate_sabuns : []
+        };
+      });
+      console.log(`✅ 면접관 ${data.length}명 로드 완료`);
+    }
+  } catch(e) { console.warn('면접관 로드 실패:', e); }
+}
+
+/* ── 면접관 데이터를 DB에 저장 ── */
+async function saveInterviewersToDB() {
+  try {
+    const entries = Object.entries(INTERVIEWER_MAP).map(([sabun, info]) => ({
+      sabun,
+      name: info.name,
+      candidate_sabuns: info.sabuns || []
+    }));
+    if (entries.length === 0) return;
+    const { error } = await _sb.from('interviewers').upsert(entries, { onConflict: 'sabun' });
+    if (error) throw error;
+    console.log(`✅ 면접관 ${entries.length}명 DB 저장 완료`);
+  } catch(e) { console.warn('면접관 DB 저장 실패:', e); }
+}
+
+/* ── 면접관 관리: 추가 ── */
+async function addInterviewer() {
+  const sabun = prompt('면접관 사번을 입력하세요:');
+  if (!sabun || !sabun.trim()) return;
+  const name = prompt('면접관 성명을 입력하세요:');
+  if (!name || !name.trim()) return;
+  INTERVIEWER_MAP[sabun.trim()] = { name: name.trim(), sabuns: [] };
+  await saveInterviewersToDB();
+  renderInterviewerAdmin();
+}
+
+/* ── 면접관 관리: 삭제 ── */
+async function deleteInterviewer(sabun) {
+  if (!confirm(`면접관 ${INTERVIEWER_MAP[sabun]?.name||sabun}을(를) 삭제하시겠습니까?`)) return;
+  delete INTERVIEWER_MAP[sabun];
+  try { await _sb.from('interviewers').delete().eq('sabun', sabun); } catch(e) {}
+  renderInterviewerAdmin();
+}
+
+/* ── 면접관 관리: 지원자 매핑 수정 ── */
+async function editInterviewerMapping(ivSabun) {
+  const info = INTERVIEWER_MAP[ivSabun];
+  if (!info) return;
+  const current = (info.sabuns||[]).join(', ');
+  const input = prompt(`${info.name} 면접관의 담당 지원자 사번을 쉼표로 구분하여 입력하세요:\n\n현재: ${current || '(없음)'}`, current);
+  if (input === null) return;
+  info.sabuns = input.split(',').map(s => s.trim()).filter(s => s);
+  await saveInterviewersToDB();
+  renderInterviewerAdmin();
+}
+
+/* ── 면접관 관리: 목록 렌더링 ── */
+function renderInterviewerAdmin() {
+  const el = document.getElementById('iv-admin-list');
+  if (!el) return;
+  const entries = Object.entries(INTERVIEWER_MAP);
+  if (!entries.length) {
+    el.innerHTML = '<div style="text-align:center;color:var(--g400);padding:24px">등록된 면접관이 없습니다.<br>파일 ① 업로드 또는 직접 추가해주세요.</div>';
+    return;
+  }
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.8rem">
+    <thead><tr style="background:var(--g50)">
+      <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--g200)">사번</th>
+      <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--g200)">성명</th>
+      <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--g200)">담당 지원자 (사번)</th>
+      <th style="padding:8px 10px;text-align:center;border-bottom:1px solid var(--g200);width:120px">관리</th>
+    </tr></thead>
+    <tbody>${entries.map(([sab, info]) => `<tr>
+      <td style="padding:8px 10px;border-bottom:1px solid var(--g100)">${sab}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid var(--g100)">${info.name}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid var(--g100);color:var(--g500);font-size:0.75rem">${(info.sabuns||[]).length}명 — ${(info.sabuns||[]).slice(0,5).join(', ')}${(info.sabuns||[]).length>5?'…':''}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid var(--g100);text-align:center">
+        <button onclick="editInterviewerMapping('${sab}')" style="font-size:0.7rem;padding:3px 8px;border:1px solid var(--g300);border-radius:4px;background:var(--white);cursor:pointer;margin-right:4px">매핑</button>
+        <button onclick="deleteInterviewer('${sab}')" style="font-size:0.7rem;padding:3px 8px;border:1px solid #fca5a5;border-radius:4px;background:#fef2f2;color:#dc2626;cursor:pointer">삭제</button>
+      </td>
+    </tr>`).join('')}</tbody></table>`;
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
   if (SUPABASE_URL.includes('YOUR_PROJECT_ID')) {
-    console.warn('⚠️ Supabase URL/KEY가 설정되지 않았습니다. 콘솔에서 printSchemaGuide()를 실행하여 스키마를 확인하세요.');
+    console.warn('⚠️ Supabase URL/KEY가 설정되지 않았습니다.');
   } else {
     await checkSupabaseConnection();
+    await loadInterviewersFromDB();
   }
 });
 
