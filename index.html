@@ -5307,6 +5307,19 @@ async function uploadFile3() {
     const ab = await fi.files[0].arrayBuffer();
     const wb = XLSX.read(ab, { type:'array' });
     const ws = wb.Sheets[wb.SheetNames[0]];
+
+    /* ── dimension 버그 보정: A1:A1로 잘못 설정된 경우 실제 범위 재계산 ── */
+    const cellKeys = Object.keys(ws).filter(k => k[0] !== '!');
+    if (cellKeys.length > 1) {
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+      cellKeys.forEach(k => {
+        const c = XLSX.utils.decode_cell(k);
+        if (c.r > range.e.r) range.e.r = c.r;
+        if (c.c > range.e.c) range.e.c = c.c;
+      });
+      ws['!ref'] = XLSX.utils.encode_range(range);
+    }
+
     const raw = XLSX.utils.sheet_to_json(ws, { header:'A', defval:'' });
 
     /* 헤더 행 자동 감지: 'Division' 또는 'ID' 포함된 행 찾기 */
