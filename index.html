@@ -5214,7 +5214,19 @@ async function uploadFile2() {
     const ab = await fi.files[0].arrayBuffer();
     const wb = XLSX.read(ab, { type:'array' });
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(ws, { defval:'' });
+    const raw = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+
+    /* 헤더 행 자동 감지: 'ID' 또는 'Question' 포함된 행 */
+    let hdrIdx = raw.findIndex(row => row.some(c => c && String(c) === 'ID') && row.some(c => c && String(c) === 'Question'));
+    if (hdrIdx < 0) hdrIdx = raw.findIndex(row => row.some(c => c && String(c).includes('Question')));
+    if (hdrIdx < 0) hdrIdx = 0;
+    const hdr = raw[hdrIdx];
+    const ci = (name) => hdr.findIndex(h => h && String(h).trim() === name);
+
+    const idCol = ci('ID'); const qCol = ci('Question'); const aCol = ci('Answer');
+    if (idCol < 0 || qCol < 0 || aCol < 0) {
+      throw new Error(`헤더 컬럼을 찾을 수 없습니다. ID(${idCol}), Question(${qCol}), Answer(${aCol})`);
+    }
 
     /* Question → q1~q6 매핑 */
     const qMap = {
@@ -5228,16 +5240,17 @@ async function uploadFile2() {
 
     /* sabun별 application 객체 구축 */
     const appMap = {};
-    rows.forEach(r => {
-      const sabun = String(r['ID'] || r['id'] || '').trim();
-      if (!sabun) return;
-      const q = String(r['Question'] || r['question'] || '').trim();
-      const a = String(r['Answer'] || r['answer'] || '').trim();
+    for (let i = hdrIdx + 1; i < raw.length; i++) {
+      const r = raw[i];
+      const sabun = String(r[idCol] || '').trim();
+      if (!sabun || !/^\d+$/.test(sabun)) continue;
+      const q = String(r[qCol] || '').trim();
+      const a = String(r[aCol] || '').trim();
       const qKey = qMap[q];
-      if (!qKey) return;
+      if (!qKey) continue;
       if (!appMap[sabun]) appMap[sabun] = {};
       appMap[sabun][qKey] = a;
-    });
+    }
 
     const sabuns = Object.keys(appMap);
     st.textContent = `${sabuns.length}명 지원서 파싱 완료, DB 저장 중…`;
