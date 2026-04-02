@@ -77,14 +77,13 @@ body {
 }
 /* ══ 보안: 관리자 페이지는 admin-mode 클래스 없이는 절대 표시되지 않음 ══ */
 body:not(.admin-mode) #page-admin { display: none !important; }
-/* ══ 페이지 겹침 방지: 활성 페이지는 fixed로 전체 화면 덮기 ══ */
+/* ══ 페이지 겹침 방지 ══ */
 .page.active {
-  position: fixed;
-  inset: 0;
+  position: relative;
   z-index: 10;
   overflow-y: auto;
 }
-#page-admin.active { overflow: hidden; }
+#page-admin.active { overflow: auto; }
 input, textarea, select, button { font-family: var(--font-main) !important; }
 
 .page { display:none; min-height:100vh; }
@@ -339,7 +338,7 @@ input, textarea, select, button { font-family: var(--font-main) !important; }
 .btn-logout:hover { background:rgba(249,115,22,.25); color:var(--white); border-color:rgba(249,115,22,.5); }
 
 /* ── SHELL ── */
-.shell { display:flex; flex:1; min-width:0; overflow:hidden; background:var(--bg); color:var(--g900); }
+.shell { display:flex; flex:1; min-width:0; overflow-x:hidden; overflow-y:auto; background:var(--bg); color:var(--g900); }
 .sidebar {
   width:var(--sidebar-w); background:var(--white);
   border-right:1px solid var(--g200); flex-shrink:0; overflow-y:auto;
@@ -1269,12 +1268,12 @@ input, textarea, select, button { font-family: var(--font-main) !important; }
 /* ── ADMIN PAGE ── */
 #page-admin {
   flex-direction:column;
-  height:100dvh;
-  overflow:hidden;
+  min-height:100dvh;
+  overflow:auto;
 }
 .admin-topbar { height:var(--topbar-h); background:var(--dark); border-bottom:1px solid rgba(249,115,22,.2); display:flex; align-items:center; padding:0 clamp(12px,2vw,24px); gap:clamp(8px,1.5vw,14px); position:sticky; top:0; z-index:210; flex-shrink:0; position:sticky; top:0; z-index:210; flex-shrink:0; box-shadow:0 2px 12px rgba(28,16,7,.2); }
 .admin-badge { background:rgba(249,115,22,.2); border:1px solid rgba(249,115,22,.4); border-radius:6px; padding:3px 10px; font-size:0.69rem; font-weight:700; color:var(--pr-300); letter-spacing:.5px; }
-.admin-shell   { display:flex; flex:1; min-height:0; overflow:hidden; min-width:0; }
+.admin-shell   { display:flex; flex:1; min-height:0; overflow:auto; min-width:0; }
 .admin-sidebar { display:none; } /* 사이드바 숨김 — 상단 탭으로 대체 */
 .admin-tab-nav {
   position:sticky; top:var(--topbar-h); z-index:190;
@@ -1293,7 +1292,7 @@ input, textarea, select, button { font-family: var(--font-main) !important; }
 .admin-tab-item:hover  { color:var(--pr-600); background:var(--pr-50); border-radius:6px 6px 0 0; }
 .admin-tab-item.active { color:var(--pr-700); border-bottom-color:var(--pr-500); font-weight:700; }
 .admin-menu-item { display:none; } /* 호환성 유지 */
-.admin-shell { display:flex; flex-direction:column; flex:1; overflow:hidden; height:calc(100dvh - var(--topbar-h)); min-width:0; }
+.admin-shell { display:flex; flex-direction:column; flex:1; overflow:auto; min-height:calc(100dvh - var(--topbar-h)); min-width:0; }
 .admin-main  { flex:1; min-width:0; min-height:0; width:100%; padding:var(--page-pad); overflow-y:auto; overflow-x:hidden; background:var(--bg); }
 .admin-panel { display:none; }
 .admin-panel.active { display:block; }
@@ -1698,25 +1697,25 @@ input, textarea, select, button { font-family: var(--font-main) !important; }
             </div>
             <div class="ins-card-body">
               <div class="ins-sub-label">유형</div>
-              <div class="ins-br" id="ibt0" data-type="reviewType" data-val="상승" data-match="includes" onclick="insBarClick(this)">
-                <div class="ins-br-lbl">N년 상승</div><div class="ins-br-track"><div class="ins-br-fill" style="background:#16a34a" id="ibt0-fill"></div></div><div class="ins-br-val" id="ibt0-val">—</div>
+              <div class="ins-br" id="ibt0" data-type="reviewType" data-val="직무상승" onclick="insBarClick(this)">
+                <div class="ins-br-lbl">어쏘상승</div><div class="ins-br-track"><div class="ins-br-fill" style="background:#16a34a" id="ibt0-fill"></div></div><div class="ins-br-val" id="ibt0-val">—</div>
               </div>
-              <div class="ins-br" id="ibt1" data-type="reviewType" data-val="미달" data-match="includes" onclick="insBarClick(this)">
-                <div class="ins-br-lbl">기준미달</div><div class="ins-br-track"><div class="ins-br-fill" style="background:var(--g400)" id="ibt1-fill"></div></div><div class="ins-br-val" id="ibt1-val">—</div>
+              <div class="ins-br" id="ibt1" data-type="reviewType" data-val="5급 승진" onclick="insBarClick(this)">
+                <div class="ins-br-lbl">5급 승진</div><div class="ins-br-track"><div class="ins-br-fill" style="background:var(--g400)" id="ibt1-fill"></div></div><div class="ins-br-val" id="ibt1-val">—</div>
               </div>
-              <div class="ins-br" id="ibt2" data-type="reviewType" data-val="재평가" data-match="includes" onclick="insBarClick(this)">
-                <div class="ins-br-lbl">직무재평가</div><div class="ins-br-track"><div class="ins-br-fill" style="background:#dc2626" id="ibt2-fill"></div></div><div class="ins-br-val" id="ibt2-val">—</div>
+              <div class="ins-br" id="ibt2" data-type="reviewType" data-val="직무미달" onclick="insBarClick(this)">
+                <div class="ins-br-lbl">직무미달</div><div class="ins-br-track"><div class="ins-br-fill" style="background:#dc2626" id="ibt2-fill"></div></div><div class="ins-br-val" id="ibt2-val">—</div>
               </div>
               <div class="ins-divider" style="margin:12px 0"></div>
               <div class="ins-sub-label">기준</div>
-              <div class="ins-br" id="ibc0" data-type="criterion" data-val="직무상승" onclick="insBarClick(this)">
-                <div class="ins-br-lbl">직무상승</div><div class="ins-br-track"><div class="ins-br-fill" style="background:var(--pr-500)" id="ibc0-fill"></div></div><div class="ins-br-val" id="ibc0-val">—</div>
+              <div class="ins-br" id="ibc0" data-type="criterion" data-val="성과기준" onclick="insBarClick(this)">
+                <div class="ins-br-lbl">성과기준</div><div class="ins-br-track"><div class="ins-br-fill" style="background:var(--pr-500)" id="ibc0-fill"></div></div><div class="ins-br-val" id="ibc0-val">—</div>
               </div>
-              <div class="ins-br" id="ibc1" data-type="criterion" data-val="직무내역량증명" onclick="insBarClick(this)">
-                <div class="ins-br-lbl">직무내역량증명</div><div class="ins-br-track"><div class="ins-br-fill" style="background:var(--pr-500)" id="ibc1-fill"></div></div><div class="ins-br-val" id="ibc1-val">—</div>
+              <div class="ins-br" id="ibc1" data-type="criterion" data-val="직무역량" onclick="insBarClick(this)">
+                <div class="ins-br-lbl">직무역량</div><div class="ins-br-track"><div class="ins-br-fill" style="background:var(--pr-500)" id="ibc1-fill"></div></div><div class="ins-br-val" id="ibc1-val">—</div>
               </div>
-              <div class="ins-br" id="ibc2" data-type="criterion" data-val="직무재평가" onclick="insBarClick(this)">
-                <div class="ins-br-lbl">직무재평가</div><div class="ins-br-track"><div class="ins-br-fill" style="background:var(--pr-500)" id="ibc2-fill"></div></div><div class="ins-br-val" id="ibc2-val">—</div>
+              <div class="ins-br" id="ibc2" data-type="criterion" data-val="직무내역량증명" onclick="insBarClick(this)">
+                <div class="ins-br-lbl">직무내역량</div><div class="ins-br-track"><div class="ins-br-fill" style="background:var(--pr-500)" id="ibc2-fill"></div></div><div class="ins-br-val" id="ibc2-val">—</div>
               </div>
             </div>
           </div>
@@ -1927,15 +1926,9 @@ input, textarea, select, button { font-family: var(--font-main) !important; }
                 <label class="admin-label">심의유형</label>
                 <select class="admin-input" id="inf-reviewType">
                   <option value="">선택</option>
-                  <option value="1년만에 상승">1년만에 상승</option>
-                  <option value="2년만에 상승">2년만에 상승</option>
-                  <option value="3년만에 상승">3년만에 상승</option>
-                  <option value="4년만에 상승">4년만에 상승</option>
-                  <option value="5년만에 상승">5년만에 상승</option>
-                  <option value="7년만에 상승">7년만에 상승</option>
-                  <option value="본부기준미달">본부기준미달</option>
-                  <option value="어쏘캐치업">어쏘캐치업</option>
-                  <option value="직무재평가">직무재평가</option>
+                  <option value="상승">상승</option>
+                  <option value="미달">미달</option>
+                  <option value="재평가">재평가</option>
                 </select>
               </div>
             </div>
@@ -2297,14 +2290,20 @@ function exportRawExcel() {
   /* 면접관 5명 조회 (사번, 성명 쌍) */
   function buildIvPairs(c) {
     let ivs = [];
-    const mapped = CANDIDATE_IV_MAP[String(c.sabun)];
-    if(mapped && mapped.length>0) ivs = mapped.slice(0,5).map(iv=>({s:iv.sabun,n:iv.name}));
-    else if(c.interviews && c.interviews.length>0) ivs = c.interviews.slice(0,5).map(iv=>({s:iv.interviewer||'',n:''}));
+    /* ① DB에 저장된 원본 순서 (최우선) */
+    const dbOrder = c.interviewerOrder;
+    if(dbOrder && dbOrder.length>0) ivs = dbOrder.slice(0,5).map(iv=>({s:iv.sabun,n:iv.name}));
+    /* ② 메모리 맵 */
     else {
-      for(const[k,v] of Object.entries(INTERVIEWER_MAP)){
-        if((v.sabuns||[]).includes(String(c.sabun))){
-          ivs.push({s:k,n:v.name});
-          if(ivs.length>=5) break;
+      const mapped = CANDIDATE_IV_MAP[String(c.sabun)];
+      if(mapped && mapped.length>0) ivs = mapped.slice(0,5).map(iv=>({s:iv.sabun,n:iv.name}));
+      else if(c.interviews && c.interviews.length>0) ivs = c.interviews.slice(0,5).map(iv=>({s:iv.interviewer||'',n:''}));
+      else {
+        for(const[k,v] of Object.entries(INTERVIEWER_MAP)){
+          if((v.sabuns||[]).includes(String(c.sabun))){
+            ivs.push({s:k,n:v.name});
+            if(ivs.length>=5) break;
+          }
         }
       }
     }
@@ -2413,8 +2412,16 @@ function exportRawExcel() {
   const emptyRow2 = new Array(header.length).fill(null);
   const ws = XLSX.utils.aoa_to_sheet([emptyRow1, emptyRow2, header, ...dataRows]);
 
-  /* 사번 숫자 컬럼 처리 */
+  /* 사번 숫자 컬럼 + 날짜 컬럼 처리 */
   const numCols = new Set([1, 9, 11, 13, 15, 17]); // 사원번호 + 면접관사번 x5
+  const dateCols = new Set([29, 31, 33, 36, 38]);   // 직무확정일1,2,3 + 부서이동일(현),(전)
+  const dateStrToSerial = (s) => {
+    if (!s || typeof s !== 'string') return null;
+    const p = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (!p) return null;
+    const ms = Date.UTC(+p[1], +p[2]-1, +p[3]);
+    return Math.round(ms / 86400000) + 25569;
+  };
   const rng = XLSX.utils.decode_range(ws['!ref']);
   for(let R=3; R<=rng.e.r; R++) {   // 데이터 행부터 (row3 = header 아래)
     for(let C=rng.s.c; C<=rng.e.c; C++) {
@@ -2425,6 +2432,10 @@ function exportRawExcel() {
         if(!isNaN(num) && ws[addr].v!=='' && ws[addr].v!==null) {
           ws[addr].t='n'; ws[addr].v=num;
         } else { ws[addr].t='s'; ws[addr].v=String(ws[addr].v||''); }
+      } else if(dateCols.has(C)) {
+        const serial = dateStrToSerial(ws[addr].v);
+        if(serial) { ws[addr].t='n'; ws[addr].v=serial; ws[addr].z='yyyy-mm-dd'; }
+        else { ws[addr].t='s'; ws[addr].v=String(ws[addr].v||''); }
       } else {
         ws[addr].t='s';
         ws[addr].v=(ws[addr].v===null||ws[addr].v===undefined)?'':String(ws[addr].v);
@@ -2482,10 +2493,14 @@ function exportInterviewerExcel() {
   const toNum=v=>{const n=Number(v);return(!isNaN(n)&&v!==''&&v!==null)?n:fmtS(v);};
   function buildIvPairs(c){
     let ivs=[];
-    const mapped=CANDIDATE_IV_MAP[String(c.sabun)];
-    if(mapped&&mapped.length>0) ivs=mapped.slice(0,5).map(iv=>({s:iv.sabun,n:iv.name}));
-    else if(c.interviews&&c.interviews.length>0) ivs=c.interviews.slice(0,5).map(iv=>({s:iv.interviewer||'',n:''}));
-    else { for(const[k,v]of Object.entries(INTERVIEWER_MAP)){if((v.sabuns||[]).includes(String(c.sabun))){ivs.push({s:k,n:v.name});if(ivs.length>=5)break;}} }
+    const dbOrder=c.interviewerOrder;
+    if(dbOrder&&dbOrder.length>0) ivs=dbOrder.slice(0,5).map(iv=>({s:iv.sabun,n:iv.name}));
+    else{
+      const mapped=CANDIDATE_IV_MAP[String(c.sabun)];
+      if(mapped&&mapped.length>0) ivs=mapped.slice(0,5).map(iv=>({s:iv.sabun,n:iv.name}));
+      else if(c.interviews&&c.interviews.length>0) ivs=c.interviews.slice(0,5).map(iv=>({s:iv.interviewer||'',n:''}));
+      else { for(const[k,v]of Object.entries(INTERVIEWER_MAP)){if((v.sabuns||[]).includes(String(c.sabun))){ivs.push({s:k,n:v.name});if(ivs.length>=5)break;}} }
+    }
     while(ivs.length<5)ivs.push({s:'',n:''});
     return ivs.slice(0,5);
   }
@@ -2536,6 +2551,20 @@ function exportExcel(mode) {
 
   /* ── 면접관 역방향 조회: sabun → [{ivSabun, ivName}] ── */
   function getIvPairs(sabun) {
+    /* ① DB에 저장된 원본 순서 (최우선) */
+    const c = list.find(x => String(x.sabun) === String(sabun));
+    if (c && c.interviewerOrder && c.interviewerOrder.length > 0) {
+      const pairs = c.interviewerOrder.slice(0,5).map(iv => ({ivSabun: iv.sabun, ivName: iv.name}));
+      while (pairs.length < 5) pairs.push({ivSabun:'', ivName:''});
+      return pairs;
+    }
+    /* ② 메모리 맵 → INTERVIEWER_MAP 역방향 */
+    const mapped = CANDIDATE_IV_MAP[String(sabun)];
+    if (mapped && mapped.length > 0) {
+      const pairs = mapped.slice(0,5).map(iv => ({ivSabun: iv.sabun, ivName: iv.name}));
+      while (pairs.length < 5) pairs.push({ivSabun:'', ivName:''});
+      return pairs;
+    }
     const pairs = [];
     for (const [ivSabun, info] of Object.entries(INTERVIEWER_MAP)) {
       if ((info.sabuns||[]).includes(String(sabun))) {
@@ -2692,8 +2721,16 @@ function exportExcel(mode) {
   /* 머지: row0 col10~19 = 심층면접관 */
   ws['!merges'] = [{s:{r:0,c:10}, e:{r:0,c:19}}];
 
-  /* 셀 타입 처리: 사원번호(col1), 면접관 사번(col10,12,14,16,18) → 숫자, 나머지 → 텍스트 */
+  /* 셀 타입 처리: 사원번호(col1), 면접관 사번(col10,12,14,16,18) → 숫자, 날짜 → 날짜 셀, 나머지 → 텍스트 */
   const numCols = new Set([1,10,12,14,16,18]);
+  const dateCols = new Set([28, 30, 32, 35, 37]); // 직무확정일1,2,3 + 부서이동일(현),(전)
+  const dateStrToSerial = (s) => {
+    if (!s || typeof s !== 'string') return null;
+    const p = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (!p) return null;
+    const ms = Date.UTC(+p[1], +p[2]-1, +p[3]);
+    return Math.round(ms / 86400000) + 25569;
+  };
   const rng = XLSX.utils.decode_range(ws['!ref']);
   for (let R=rng.s.r; R<=rng.e.r; R++) {
     for (let C=rng.s.c; C<=rng.e.c; C++) {
@@ -2704,6 +2741,10 @@ function exportExcel(mode) {
         if (!isNaN(num)&&ws[addr].v!==''&&ws[addr].v!==null) {
           ws[addr].t='n'; ws[addr].v=num;
         } else { ws[addr].t='s'; ws[addr].v=String(ws[addr].v||''); }
+      } else if (dateCols.has(C) && R>=2) {
+        const serial = dateStrToSerial(ws[addr].v);
+        if(serial) { ws[addr].t='n'; ws[addr].v=serial; ws[addr].z='yyyy-mm-dd'; }
+        else { ws[addr].t='s'; ws[addr].v=String(ws[addr].v||''); }
       } else {
         ws[addr].t='s';
         ws[addr].v=(ws[addr].v===null||ws[addr].v===undefined)?'':String(ws[addr].v);
@@ -2842,7 +2883,7 @@ const ADMIN_SAMPLE = { id: 'admin', pw: 'daewoong2026!' };
    'CODE'  : { label:'그룹명', sabuns:['사번1','사번2',...] }
 ══════════════════════════════════════════════════════════ */
 /* ── 면접관 맵핑 (사번 → {name, sabuns}) ── */
-const INTERVIEWER_MAP = {};  // ← DB에서 동적 로드 (하드코딩 없음)
+const INTERVIEWER_MAP = {"2060068": {"name": "김경윤", "sabuns": ["2230409"]}, "2160156": {"name": "김상기", "sabuns": ["2230409"]}, "2020262": {"name": "최창진", "sabuns": ["2230409"]}, "2150146": {"name": "윤재영", "sabuns": ["2210563", "2220677", "2190210", "2200073", "2210316", "2220454", "2180415", "2230011", "2210155", "2230336", "2210483", "2210520", "2220183", "2220185", "2220536", "2220298", "2210360", "2230089", "2200165", "2210429", "2220213", "2220483", "2220658", "2220616"]}, "2210270": {"name": "전진호", "sabuns": ["2210563", "2220677", "2190210", "2200073", "2210316", "2220454", "2180415", "2230011", "2210155", "2230336", "2210483", "2210520", "2220183", "2220185", "2220536", "2220298", "2210360", "2230089", "2200165", "2210429", "2220213", "2220483", "2220658", "2220616"]}, "2160147": {"name": "장동혁", "sabuns": ["2210563", "2220677", "2190210", "2200073", "2210316", "2220454", "2180415", "2230011", "2210155", "2230336", "2210483", "2210520", "2220183", "2220185", "2220536", "2220298", "2210360", "2230089", "2200165", "2210429", "2220213", "2220483", "2220658", "2220616"]}, "2250041": {"name": "이범석", "sabuns": ["2210563", "2220677", "2190210", "2200073", "2210316", "2220454", "2180415", "2230011", "2210155", "2230336", "2210483", "2210520", "2220183", "2220185", "2220536", "2220298", "2210360", "2230089", "2200165", "2210429", "2220213", "2220483", "2220658", "2220616"]}, "2200088": {"name": "차준우", "sabuns": ["2180213"]}, "2100343": {"name": "이태연", "sabuns": ["2180213"]}, "2210196": {"name": "허완", "sabuns": ["2180213"]}, "2240360": {"name": "허윤아", "sabuns": ["2180213"]}, "2240011": {"name": "유지민", "sabuns": ["2240406"]}, "2240317": {"name": "백영석", "sabuns": ["2240406"]}, "2140117": {"name": "장희정", "sabuns": ["2240406"]}, "2230127": {"name": "양정현", "sabuns": ["2240406"]}, "2060118": {"name": "박민선", "sabuns": ["2240406"]}};
 
 const CANDIDATE_IV_MAP = {}; // ← Supabase에서 로드됩니다
 
@@ -4226,12 +4267,12 @@ function insRenderKPIs(){
 function insRenderBars(){
   var total=candidates.length;
   var bDefs=[
-    {id:'ibt0',type:'reviewType',val:'상승',match:'includes'},
-    {id:'ibt1',type:'reviewType',val:'미달',match:'includes'},
-    {id:'ibt2',type:'reviewType',val:'재평가',match:'includes'},
+    {id:'ibt0',type:'reviewType',val:'어쏘상승'},
+    {id:'ibt1',type:'reviewType',val:'5급 승진'},
+    {id:'ibt2',type:'reviewType',val:'직무미달'},
     {id:'ibc0',type:'criterion',val:'직무상승'},
-    {id:'ibc1',type:'criterion',val:'직무내역량증명'},
-    {id:'ibc2',type:'criterion',val:'예외'},
+    {id:'ibc1',type:'criterion',val:'성과기준'},
+    {id:'ibc2',type:'criterion',val:'직무역량'},
     {id:'ibca0',type:'careerType',val:'자사'},
     {id:'ibca1',type:'careerType',val:'그룹사'},
     {id:'ibca2',type:'careerType',val:'타사'},
@@ -4242,8 +4283,6 @@ function insRenderBars(){
       if(b.val==='자사')   cnt=candidates.filter(function(c){return!parseFloat((c.career||{}).outside||0);}).length;
       else if(b.val==='그룹사') cnt=candidates.filter(function(c){return parseFloat((c.career||{}).group||0)>0;}).length;
       else cnt=candidates.filter(function(c){return parseFloat((c.career||{}).outside||0)>0;}).length;
-    } else if(b.match==='includes'){
-      cnt=candidates.filter(function(c){return c[b.type]&&c[b.type].includes(b.val);}).length;
     } else {
       cnt=candidates.filter(function(c){return c[b.type]===b.val;}).length;
     }
@@ -4408,7 +4447,7 @@ function insToggleSpeed(key,fn){
   else{insKF[k]=fn;el&&el.classList.add('on');}
   insUpdateRoster();
 }
-function insBarClick(el){var type=el.dataset.type,val=el.dataset.val,matchType=el.dataset.match||'exact',k=type+':'+val;if(insBF[k]){delete insBF[k];el.classList.remove('on');}else{insBF[k]={type:type,val:val,matchType:matchType};el.classList.add('on');}insUpdateRoster();}
+function insBarClick(el){var type=el.dataset.type,val=el.dataset.val,k=type+':'+val;if(insBF[k]){delete insBF[k];el.classList.remove('on');}else{insBF[k]={type:type,val:val};el.classList.add('on');}insUpdateRoster();}
 function insToggleIV(sabun,name){var k='iv:'+sabun;document.querySelectorAll('[id^="ins-iv-"]').forEach(function(r){r.classList.remove('on');});Object.keys(insKF).filter(function(x){return x.startsWith('iv:');}).forEach(function(x){delete insKF[x];});if(insKF[k]){delete insKF[k];}else{insKF[k]=function(c){return((INTERVIEWER_MAP[sabun]||{}).sabuns||[]).includes(c.sabun);};var el=document.getElementById('ins-iv-'+sabun);if(el)el.classList.add('on');}insUpdateRoster();}
 function insTogglePie(field,val,itemId){var k='pie:'+field+':'+val;var el=document.getElementById(itemId);if(insBF[k]){delete insBF[k];el&&el.classList.remove('on');}else{insBF[k]={type:'pie',field:field,val:val};el&&el.classList.add('on');}insUpdateRoster();}
 
@@ -4423,10 +4462,7 @@ function insMatch(p){
       if(bf.val==='자사'&&parseFloat((p.career||{}).outside||0)>0)return false;
       if(bf.val==='그룹사'&&parseFloat((p.career||{}).group||0)<=0)return false;
       if(bf.val==='타사'&&parseFloat((p.career||{}).outside||0)<=0)return false;
-    } else {
-      if(bf.matchType==='includes'){if(!p[bf.type]||!p[bf.type].includes(bf.val))return false;}
-      else{if(p[bf.type]!==bf.val)return false;}
-    }
+    } else {if(p[bf.type]!==bf.val)return false;}
   }
   return true;
 }
@@ -4562,19 +4598,19 @@ function insSelectPerson(idx) {
 
   /* ── 심의유형·기준 바 하이라이팅 ── */
   var barMap = [
-    {id:'ibt0', type:'reviewType', val:'상승', match:'includes'},
-    {id:'ibt1', type:'reviewType', val:'미달', match:'includes'},
-    {id:'ibt2', type:'reviewType', val:'재평가', match:'includes'},
-    {id:'ibc0', type:'criterion',  val:'직무상승'},
-    {id:'ibc1', type:'criterion',  val:'직무내역량증명'},
-    {id:'ibc2', type:'criterion',  val:'직무재평가'},
+    {id:'ibt0', type:'reviewType', val:'직무상승'},
+    {id:'ibt1', type:'reviewType', val:'직무재평가'},
+    {id:'ibt2', type:'reviewType', val:'직무미달'},
+    {id:'ibc0', type:'criterion',  val:'성과기준'},
+    {id:'ibc1', type:'criterion',  val:'직무역량'},
+    {id:'ibc2', type:'criterion',  val:'직무내역량증명'},
     {id:'ibca0',type:'careerType', val:'자사'},
     {id:'ibca1',type:'careerType', val:'그룹사'},
     {id:'ibca2',type:'careerType', val:'타사'},
   ];
   barMap.forEach(function(b) {
     var match = false;
-    if (b.type === 'reviewType') match = c.reviewType && c.reviewType.includes(b.val);
+    if (b.type === 'reviewType') match = c.reviewType === b.val;
     else if (b.type === 'criterion') match = c.criterion === b.val;
     else if (b.type === 'careerType') {
       if (b.val === '자사')   match = !parseFloat((c.career||{}).outside||0);
@@ -4672,9 +4708,9 @@ function loadAdminInfo(){
   $('inf-criterion').value     = c.criterion||'';
   // 심의유형 select — 정확히 일치하지 않으면 빈 값
   const rvSel=$('inf-reviewType');
-  rvSel.value=c.reviewType||'';
-  // 정확 일치 없으면 빈 값 (커스텀 입력 필요)
-  if(!rvSel.value && c.reviewType) rvSel.value='';
+  const rvOpts=['상승','미달','재평가'];
+  const matched=rvOpts.find(v=>c.reviewType?.includes(v));
+  rvSel.value=matched||'';
   $('inf-note').value          = c.note||'';
 }
 async function saveAdminInfo(){
@@ -5329,7 +5365,7 @@ async function uploadFile1() {
     const wb = XLSX.read(ab, { type:'array' });
 
     /* ── 시트1: 지원자 기본정보 ── */
-    const mainSheet = wb.SheetNames.find(n => n.includes('직무심의') || n.includes('클로드') || n.includes('비영업') || n.includes('영업')) || wb.SheetNames[0];
+    const mainSheet = wb.SheetNames.find(n => n.includes('클로드') || n.includes('비영업') || n.includes('영업')) || wb.SheetNames[0];
     const ws = wb.Sheets[mainSheet];
     const raw = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
     /* 헤더 행 자동 감지: '사원' 포함된 행 찾기 */
@@ -5434,6 +5470,20 @@ async function uploadFile1() {
         outsideCompany: String(r[col('타사(경력회사명)')] || '')
       };
 
+      /* 면접관 순서 보존: ★본부 다음 ~ 현직무 이전 영역 */
+      const interviewerOrder = [];
+      const _bonbuIdx = hdr.findIndex(h => h && String(h).includes('★본부'));
+      const _curJobIdx = col('현직무');
+      if (_bonbuIdx >= 0 && _curJobIdx > _bonbuIdx) {
+        for (let j = _bonbuIdx + 1; j < _curJobIdx; j += 2) {
+          const ivSab = String(r[j] || '').trim();
+          const ivNm = String(r[j+1] || '').trim();
+          if (ivSab && /^\d+$/.test(ivSab) && ivNm) {
+            interviewerOrder.push({ sabun: ivSab, name: ivNm });
+          }
+        }
+      }
+
       employees.push({
         sabun,
         name: String(r[col('성명')] || ''),
@@ -5453,6 +5503,7 @@ async function uploadFile1() {
         innovation: String(r[col('변화혁신과제')] || ''),
         innovationNm: String(r[col('변화혁신과제명')] || ''),
         hireType: String(r[col('채용구분')] || ''),
+        interviewerOrder,
         jobHistory, deptHistory, annualEval, multiEval,
         rewards, penalties, career
       });
@@ -5691,11 +5742,8 @@ async function uploadFile3() {
       const r = raw[i];
       const sabun = String(r.E || '').trim();
       if (!sabun) continue;
-      const periodRaw = String(r.F || '').trim();
-      if (!periodRaw) continue;
-      /* '2026년 월별피드백 - 3월' → '2026-03' 정규화 (정렬·표시용) */
-      const _pm = periodRaw.match(/(\d{4}).*?(\d{1,2})월/);
-      const period = _pm ? _pm[1]+'-'+_pm[2].padStart(2,'0') : periodRaw;
+      const period = String(r.F || '').trim();
+      if (!period) continue;
       const qType = String(r.I || '').trim();
       const empRating = String(r.J || '').trim();
       const empComment = String(r.K || '').trim();
