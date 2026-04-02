@@ -2205,12 +2205,14 @@ function exportRawExcel() {
   const fmtS = v => (v==null?'':String(v));
   const toNum = v => { const n=Number(v); return(!isNaN(n)&&v!==''&&v!==null)?n:fmtS(v); };
 
-  /* 연간평가: year키 정규화 후 정확 매칭 (2025하 vs 2025 구분) */
+  /* 연간평가: year키 정규화 후 정확 매칭 (4분기/2025하 vs 2025 구분) */
   function buildEvalMap(c) {
     const m = {};
     (c.annualEval||[]).forEach(e => {
       const raw = String(e.year||'').trim();
-      /* "2025년" → "2025", "2025하반기" → "2025하", "2025하" → "2025하" */
+      /* 4분기평가는 별도 키로 보존 */
+      if (raw === '4분기') { if (!m['4분기']) m['4분기'] = fmtS(e.grade); return; }
+      /* "2025하" → "2025하", "2025년" → "2025", "2025하반기" → "2025하" */
       const key = raw.replace(/년$/,'').replace(/반기$/,'').replace(/[^0-9하]/g,'');
       if (key && !m[key]) m[key] = fmtS(e.grade);
     });
@@ -5298,15 +5300,23 @@ async function uploadFile1() {
       const dOrg2 = r[col('부서이동조직(전)')], dDate2 = r[col('부서이동일(전)')];
       if (dOrg2) deptHistory.push({ date: fmtDate(dDate2), org: String(dOrg2) });
 
-      /* 연간평가 */
+      /* 연간평가 — 컬럼별 정확 매칭 (하반기/연간 구분) */
       const annualEval = [];
-      ['2025년','2025','2024년','2023년','2022년','2021년'].forEach(yr => {
-        const ci = hdr.findIndex((h,idx) => h && String(h).includes(yr.replace('년','')) && idx >= col('채용구분'));
-        if (ci >= 0 && r[ci]) annualEval.push({ year: yr.includes('년') ? yr : yr+'년', grade: String(r[ci]) });
+      /* 4분기평가 */
+      const q4Idx = hdr.findIndex(h => h && String(h).replace(/\s/g,'').includes('4분기평가'));
+      if (q4Idx >= 0 && r[q4Idx]) annualEval.push({ year: '4분기', grade: String(r[q4Idx]) });
+      /* 2025년 하반기 */
+      const halfIdx = hdr.findIndex(h => h && String(h).replace(/\s/g,'').includes('하반기'));
+      if (halfIdx >= 0 && r[halfIdx]) annualEval.push({ year: '2025하', grade: String(r[halfIdx]) });
+      /* 2025~2021 연간: '하반기'/'4분기' 컬럼 제외하고 매칭 */
+      [2025, 2024, 2023, 2022, 2021].forEach(yr => {
+        const ci = hdr.findIndex((h, idx) => {
+          if (!h || idx < (col('채용구분') >= 0 ? col('채용구분') : 28)) return false;
+          const s = String(h).replace(/\s/g,'');
+          return (s === String(yr) || s === yr+'년') && !s.includes('하반기') && !s.includes('4분기');
+        });
+        if (ci >= 0 && r[ci]) annualEval.push({ year: yr+'년', grade: String(r[ci]) });
       });
-      /* 하반기 컬럼 체크 */
-      const halfIdx = col('2025년하반기') >= 0 ? col('2025년하반기') : hdr.findIndex(h => h && String(h).includes('하반기'));
-      if (halfIdx >= 0 && r[halfIdx]) annualEval.unshift({ year: '2025년', grade: String(r[halfIdx]) });
 
       /* 다면평가 */
       const multiEval = [];
@@ -5347,11 +5357,17 @@ async function uploadFile1() {
         dept: String(r[col('본부/실')] || r[col('본부')] || ''),
         center: String(r[col('센터/사업부')] || ''),
         team: String(r[col('팀/사무소')] || r[col('팀')] || ''),
+        position: String(r[col('직책')] || ''),
         currentJob: String(r[col('현직무')] || ''),
         applyJob: String(r[col('최종지원직무')] || ''),
         criterion: String(r[col('심의기준')] || ''),
         reviewType: String(r[col('심의유형')] || ''),
         note: String(r[col('비고')] || ''),
+        sopSuccess: String(r[col('SOP성공')] || ''),
+        mentorMenti: String(r[col('멘토멘티')] || r[col('SOP리더')] || ''),
+        innovation: String(r[col('변화혁신과제')] || ''),
+        innovationNm: String(r[col('변화혁신과제명')] || ''),
+        hireType: String(r[col('채용구분')] || ''),
         jobHistory, deptHistory, annualEval, multiEval,
         rewards, penalties, career
       });
