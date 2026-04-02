@@ -1574,9 +1574,16 @@ input, textarea, select, button { font-family: var(--font-main) !important; }
           <div class="cand-table-wrap">
             <table class="cand-table">
               <thead><tr>
-                <th>#</th><th>이름</th><th>사번</th><th>본부/실</th>
-                <th>센터/사업부</th><th>팀</th><th>현 직무</th>
-                <th>지원 직무</th><th>심의기준</th><th>심의유형</th>
+                <th>#</th>
+                <th onclick="ltSort('name')" style="cursor:pointer;user-select:none">이름 <span id="lt-sort-name"></span></th>
+                <th onclick="ltSort('sabun')" style="cursor:pointer;user-select:none">사번 <span id="lt-sort-sabun"></span></th>
+                <th onclick="ltSort('dept')" style="cursor:pointer;user-select:none">본부/실 <span id="lt-sort-dept"></span></th>
+                <th onclick="ltSort('center')" style="cursor:pointer;user-select:none">센터/사업부 <span id="lt-sort-center"></span></th>
+                <th onclick="ltSort('team')" style="cursor:pointer;user-select:none">팀 <span id="lt-sort-team"></span></th>
+                <th onclick="ltSort('currentJob')" style="cursor:pointer;user-select:none">현 직무 <span id="lt-sort-currentJob"></span></th>
+                <th onclick="ltSort('applyJob')" style="cursor:pointer;user-select:none">지원 직무 <span id="lt-sort-applyJob"></span></th>
+                <th onclick="ltSort('criterion')" style="cursor:pointer;user-select:none">심의기준 <span id="lt-sort-criterion"></span></th>
+                <th onclick="ltSort('reviewType')" style="cursor:pointer;user-select:none">심의유형 <span id="lt-sort-reviewType"></span></th>
               </tr></thead>
               <tbody id="lt-tbody"></tbody>
             </table>
@@ -2834,6 +2841,7 @@ function classifyJobGlobal(job) {
   if (j.startsWith('잡매니저'))    return '잡매니저';
   if (j.startsWith('잡멘토'))      return '잡멘토';
   if (j.includes('팀장') || j.includes('소장')) return '팀/소장';
+  if (j.includes('사업부장'))        return '사업부장';
   if (j.includes('센터장'))        return '센터장';
   if (j.includes('실장'))          return '실장';
   if (j.startsWith('RS'))          return 'RS';
@@ -3929,6 +3937,20 @@ function ltTopFilter(q) {
   renderListTable();
 }
 
+var ltSortCol = 'name', ltSortDir = 1; // 1=오름차순, -1=내림차순
+
+function ltSort(col) {
+  if (ltSortCol === col) { ltSortDir *= -1; }
+  else { ltSortCol = col; ltSortDir = 1; }
+  ['name','sabun','dept','center','team','currentJob','applyJob','criterion','reviewType'].forEach(k => {
+    const el = $('lt-sort-'+k);
+    if (!el) return;
+    if (k === ltSortCol) el.textContent = ltSortDir === 1 ? ' ▲' : ' ▼';
+    else el.textContent = '';
+  });
+  renderListTable();
+}
+
 function renderListTable() {
   const q=($('lt-search')?.value||'').toLowerCase();
   const team=$('lt-team')?.value||''; const type=$('lt-type')?.value||''; const crit=$('lt-crit')?.value||'';
@@ -3942,7 +3964,10 @@ function renderListTable() {
     /* ── 파이차트 필터 ── */
     (!reviewerDashPie.cur   || classifyJobGlobal(c.currentJob) === reviewerDashPie.cur)&&
     (!reviewerDashPie.apply || classifyJobGlobal(c.applyJob)   === reviewerDashPie.apply)
-  ).slice().sort((a,b)=>a.name.localeCompare(b.name,'ko'));
+  ).slice().sort((a,b)=>{
+    const va = String(a[ltSortCol]||''), vb = String(b[ltSortCol]||'');
+    return va.localeCompare(vb,'ko') * ltSortDir;
+  });
   const tbody=$('lt-tbody'); const empty=$('lt-empty'); const badge=$('lt-badge');
   if(!tbody) return;
   if(badge) badge.textContent=filtered.length+'명';
@@ -4283,6 +4308,7 @@ function insClassifyJob(job){
   if(j.startsWith('잡매니저'))return '잡매니저';
   if(j.startsWith('잡멘토'))return '잡멘토';
   if(j.includes('팀장')||j.includes('소장'))return '팀/소장';
+  if(j.includes('사업부장'))return '사업부장';
   if(j.includes('센터장'))return '센터장';
   if(j.includes('실장'))return '실장';
   if(j.startsWith('RS'))return 'RS';
@@ -4292,8 +4318,8 @@ function insClassifyJob(job){
   return '기타';
 }
 var INS_JOB_PALETTE={'6급':'#60a5fa','5급':'#f97316','어쏘':'#16a34a','잡멘토':'#fb923c','잡매니저':'#2563eb','팀/소장':'#d97706',
-  '센터장':'#9333ea','실장':'#e11d48','RS':'#0891b2','TS':'#65a30d','경력재평가':'#78716c','기타':'#a8a29e'};
-var INS_JOB_ORDER=['6급','5급','어쏘','잡멘토','잡매니저','팀/소장','센터장','실장','RS','TS','경력재평가','기타'];
+  '사업부장':'#be185d','센터장':'#9333ea','실장':'#e11d48','RS':'#0891b2','TS':'#65a30d','경력재평가':'#78716c','기타':'#a8a29e'};
+var INS_JOB_ORDER=['6급','5급','어쏘','잡멘토','잡매니저','팀/소장','사업부장','센터장','실장','RS','TS','경력재평가','기타'];
 
 function insRenderPie(canvasId,legId,jobField,filterField){
   var counts={};
@@ -4765,10 +4791,10 @@ function showAdminToast(msg){const t=$('admin-toast');t.textContent=msg;t.classL
 function renderJobChartsTo(curId, curLegId, applyId, applyLegId, list, onClickFn) {
 
   function classifyJob(job) { return classifyJobGlobal(job); }
-  const CATEGORY_ORDER = ['6급','5급','어쏘','잡멘토','잡매니저','팀/소장','센터장','실장','RS','TS','경력재평가','기타'];
+  const CATEGORY_ORDER = ['6급','5급','어쏘','잡멘토','잡매니저','팀/소장','사업부장','센터장','실장','RS','TS','경력재평가','기타'];
   const PALETTE = {
     '6급':'#60a5fa','5급':'#f97316','어쏘':'#16a34a','잡멘토':'#fb923c','잡매니저':'#2563eb','팀/소장':'#d97706',
-    '센터장':'#9333ea','실장':'#e11d48','RS':'#0891b2','TS':'#65a30d',
+    '사업부장':'#be185d','센터장':'#9333ea','실장':'#e11d48','RS':'#0891b2','TS':'#65a30d',
     '경력재평가':'#78716c','기타':'#a8a29e'
   };
 
@@ -5283,8 +5309,8 @@ async function uploadFile1() {
       const sabun = String(r[col('사원번호')] || '').trim();
       if (!sabun || sabun === '0') continue;
 
-      const fmtDate = (v) => { if (!v) return ''; if (v instanceof Date) return v.toISOString().slice(0,10); return String(v).slice(0,10); };
-      const pct = (v) => { if (!v) return '0'; return String(v).replace('%','').trim(); };
+      const fmtDate = (v) => { if (!v) return ''; if (v instanceof Date) { const y=v.getFullYear(), m=String(v.getMonth()+1).padStart(2,'0'), d=String(v.getDate()).padStart(2,'0'); return y+'-'+m+'-'+d; } return String(v).slice(0,10); };
+      const pct = (v) => { if (!v && v !== 0) return ''; return String(v).trim(); };
 
       /* 직무이력 */
       const jobHistory = [];
@@ -5439,11 +5465,12 @@ async function uploadFile1() {
       if (bonbuIdx >= 0 && curJobIdx > bonbuIdx) {
         const ivStartCol = bonbuIdx + 1;
         const ivEndCol = curJobIdx;
-        /* 데이터 행에서 면접관 추출 */
+        /* 데이터 행에서 면접관 추출 + 순서 보존 */
         for (let i = hdrIdx + 1; i < raw.length; i++) {
           const r = raw[i];
           const empSabun = String(r[col('사원번호')] || '').trim();
           if (!empSabun || !/^\d+$/.test(empSabun)) continue;
+          const orderedIvs = []; // 원본 엑셀 순서 보존용
           for (let j = ivStartCol; j < ivEndCol; j += 2) {
             const ivSab = String(r[j] || '').trim();
             const ivNm = String(r[j+1] || '').trim();
@@ -5454,7 +5481,9 @@ async function uploadFile1() {
             if (!INTERVIEWER_MAP[ivSab].sabuns.includes(empSabun)) {
               INTERVIEWER_MAP[ivSab].sabuns.push(empSabun);
             }
+            orderedIvs.push({ sabun: ivSab, name: ivNm });
           }
+          if (orderedIvs.length) CANDIDATE_IV_MAP[empSabun] = orderedIvs;
         }
       }
     }
