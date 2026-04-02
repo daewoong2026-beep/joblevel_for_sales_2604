@@ -2040,8 +2040,8 @@ input, textarea, select, button { font-family: var(--font-main) !important; }
 
         <!-- ① 지원자 정보 추출 -->
         <div style="background:var(--white);border:1px solid var(--g200);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:14px">
-          <div style="font-size:0.875rem;font-weight:700;color:var(--g900);margin-bottom:6px">📋 ① 지원자 리스트 추출 <span style="font-size:0.69rem;font-weight:400;color:var(--g500)">(면접관 맵핑 파일 동일 포맷, 사번 기준 정렬)</span></div>
-          <div style="font-size:0.75rem;color:var(--g500);margin-bottom:16px">사원번호 · 성명 · 조직 · 면접관 · 직무이력 · 부서이동 · 연간평가 · 다면평가 · 포상/징계 · 경력 — 1인 1행, 전체 80열</div>
+          <div style="font-size:0.875rem;font-weight:700;color:var(--g900);margin-bottom:6px">📋 ① 직무심의기초자료 추출 <span style="font-size:0.69rem;font-weight:400;color:var(--g500)">(★직무심의기초자료_raw 양식, 사번 기준 정렬)</span></div>
+          <div style="font-size:0.75rem;color:var(--g500);margin-bottom:16px">구분 · 사원번호 · 성명 · 조직 · 면접관 · 직무이력 · 부서이동 · 연간평가 · 다면평가 · 포상/징계 · 경력 — 1인 1행, 전체 81열</div>
           <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
             <label style="display:flex;align-items:center;gap:6px;font-size:0.81rem;cursor:pointer">
               <input type="radio" name="raw-scope" value="all" checked onchange="updateRawPreview()">
@@ -2055,7 +2055,7 @@ input, textarea, select, button { font-family: var(--font-main) !important; }
           <div style="margin-bottom:14px;font-size:0.75rem;color:var(--g500);padding:8px 12px;background:var(--g50);border-radius:6px" id="raw-preview-text"></div>
           <div style="display:flex;justify-content:flex-end">
             <button class="btn-excel" onclick="exportRawExcel()" style="padding:11px 24px;font-size:0.875rem">
-              <span class="excel-icon">📥</span> 지원자 리스트 다운로드
+              <span class="excel-icon">📥</span> 직무심의기초자료 다운로드
             </button>
           </div>
         </div>
@@ -2180,7 +2180,7 @@ function updateRawPreview() {
   const withApp = candidates.filter(c => c.application && Object.keys(c.application).length > 0).length;
   const count   = scope === 'all' ? total : withApp;
   const txt = $('raw-preview-text');
-  if (txt) txt.textContent = `→ ${count}명 / ${count}행 추출 예정 (1인 1행, 80열)`;
+  if (txt) txt.textContent = `→ ${count}명 / ${count}행 추출 예정 (1인 1행, 81열)`;
 }
 
 function initRawPanel() {
@@ -2203,103 +2203,243 @@ function exportRawExcel() {
 
   /* ── 헬퍼 ── */
   const fmtS = v => (v==null?'':String(v));
-  function getEval(c, year) {
-    const yr = String(year).replace(/[^0-9]/g,'');
-    const e = (c.annualEval||[]).find(e => String(e.year).replace(/[^0-9]/g,'')=== yr);
-    return e ? fmtS(e.grade) : '';
+  const toNum = v => { const n=Number(v); return(!isNaN(n)&&v!==''&&v!==null)?n:fmtS(v); };
+
+  /* 연간평가: year키 정규화 후 정확 매칭 (2025하 vs 2025 구분) */
+  function buildEvalMap(c) {
+    const m = {};
+    (c.annualEval||[]).forEach(e => {
+      const raw = String(e.year||'').trim();
+      /* "2025년" → "2025", "2025하반기" → "2025하", "2025하" → "2025하" */
+      const key = raw.replace(/년$/,'').replace(/반기$/,'').replace(/[^0-9하]/g,'');
+      if (key && !m[key]) m[key] = fmtS(e.grade);
+    });
+    return m;
   }
+
+  /* 다면평가 3년도 (최신순), 각 년도별 상·하 6칸 */
   function getMultiEval(c) {
     const me = c.multiEval||[];
-    const years = [...new Set(me.map(e=>e.year))].sort((a,b)=>b-a).slice(0,3);
+    const years = [...new Set(me.map(e=>String(e.year)))].sort((a,b)=>Number(b)-Number(a)).slice(0,3);
     while(years.length<3) years.push(null);
-    const r=[];
-    years.forEach(yr=>{
-      if(!yr){r.push('','','','','','');return;}
-      const t=me.find(e=>String(e.year)===String(yr)&&e.half==='상');
-      const b=me.find(e=>String(e.year)===String(yr)&&e.half==='하');
-      r.push(t?yr:0,t?fmtS(t.pos):'',t?fmtS(t.neg):'',b?yr:0,b?fmtS(b.pos):'',b?fmtS(b.neg):'');
+    const r = [];
+    years.forEach(yr => {
+      if(!yr){ r.push('','','','','',''); return; }
+      const s = me.find(e=>String(e.year)===yr && e.half==='상');
+      const h = me.find(e=>String(e.year)===yr && e.half==='하');
+      r.push(
+        s ? yr : '0', s ? fmtS(s.pos) : '', s ? fmtS(s.neg) : '',
+        h ? yr : '0', h ? fmtS(h.pos) : '', h ? fmtS(h.neg) : ''
+      );
     });
     return r;
   }
-  function getRwPn(arr){const r=[];for(let i=0;i<3;i++)r.push(arr[i]?fmtS(arr[i].name):'',arr[i]?fmtS(arr[i].date):'');return r;}
-  function getJobHistory(c){const jh=(c.jobHistory||[]).slice().sort((a,b)=>new Date(b.date)-new Date(a.date));const r=[];for(let i=0;i<3;i++)r.push(jh[i]?fmtS(jh[i].date):'',jh[i]?fmtS(jh[i].job):'');return r;}
-  function getDeptHistory(c){const dh=(c.deptHistory||[]).slice().sort((a,b)=>new Date(b.date)-new Date(a.date));const r=[];for(let i=0;i<2;i++)r.push(dh[i]?fmtS(dh[i].org):'',dh[i]?fmtS(dh[i].date):'');return r;}
-  function getCheoyong(c){const jh=(c.jobHistory||[]).slice().sort((a,b)=>new Date(a.date)-new Date(b.date));return jh.length?fmtS(jh[0].job):'';}
-  function buildIvPairs(c){
-    let ivs=[];
-    const mapped=CANDIDATE_IV_MAP[String(c.sabun)];
-    if(mapped&&mapped.length>0) ivs=mapped.slice(0,5).map(iv=>({s:iv.sabun,n:iv.name}));
-    else if(c.interviews&&c.interviews.length>0) ivs=c.interviews.slice(0,5).map(iv=>({s:iv.interviewer||'',n:''}));
-    else { for(const[k,v]of Object.entries(INTERVIEWER_MAP)){if((v.sabuns||[]).includes(String(c.sabun))){ivs.push({s:k,n:v.name});if(ivs.length>=5)break;}} }
-    while(ivs.length<5)ivs.push({s:'',n:''});
+
+  /* 포상/징계 각 최대 3건 → [name,date] x 3 */
+  function getRwPn(arr) {
+    const r = [];
+    for(let i=0;i<3;i++) r.push(arr[i]?fmtS(arr[i].name):'', arr[i]?fmtS(arr[i].date):'');
+    return r;
+  }
+
+  /* 직무이력 최신 3건 → [date,job] x 3 */
+  function getJobHistory(c) {
+    const jh = (c.jobHistory||[]).slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
+    const r = [];
+    for(let i=0;i<3;i++) r.push(jh[i]?fmtS(jh[i].date):'', jh[i]?fmtS(jh[i].job):'');
+    return r;
+  }
+
+  /* 부서이동 최신 2건 → [org,date] x 2 */
+  function getDeptHistory(c) {
+    const dh = (c.deptHistory||[]).slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
+    const r = [];
+    for(let i=0;i<2;i++) r.push(dh[i]?fmtS(dh[i].org):'', dh[i]?fmtS(dh[i].date):'');
+    return r;
+  }
+
+  /* 채용구분: 후보자 객체에 필드 있으면 사용, 없으면 빈칸 */
+  function getHireType(c) {
+    return fmtS(c.hireType || c.채용구분 || '');
+  }
+
+  /* 면접관 5명 조회 (사번, 성명 쌍) */
+  function buildIvPairs(c) {
+    let ivs = [];
+    const mapped = CANDIDATE_IV_MAP[String(c.sabun)];
+    if(mapped && mapped.length>0) ivs = mapped.slice(0,5).map(iv=>({s:iv.sabun,n:iv.name}));
+    else if(c.interviews && c.interviews.length>0) ivs = c.interviews.slice(0,5).map(iv=>({s:iv.interviewer||'',n:''}));
+    else {
+      for(const[k,v] of Object.entries(INTERVIEWER_MAP)){
+        if((v.sabuns||[]).includes(String(c.sabun))){
+          ivs.push({s:k,n:v.name});
+          if(ivs.length>=5) break;
+        }
+      }
+    }
+    while(ivs.length<5) ivs.push({s:'',n:''});
     return ivs.slice(0,5);
   }
-  const toNum=v=>{const n=Number(v);return(!isNaN(n)&&v!==''&&v!==null)?n:fmtS(v);};
 
-  /* ══ 시트1: ★지원자_리스트 (업로드 파일①과 동일 양식) ══ */
-  const h1=[
-    '','사원 번호','(구)사번','성명','회사','본부/실','센터/사업부','팀/사무소','★본부','★구분',
-    '직책','현직무','심의기준','심의유형','최종지원직무','비고','지원서\n작성','채용구분',
-    '직무확정일1','직무1','직무확정일2','직무2','직무확정일3','직무3',
-    '부서이동조직(현)','부서이동일(현)','부서이동조직(전)','부서이동일(전)',
-    '2025년\n하반기',2025,'2024년','2023년','2022년','2021년',
-    '다면년도1','긍정1(상)','부정1(상)','다면년도1','긍정1(하)','부정1(하)',
-    '다면년도2','긍정2(상)','부정2(상)','다면년도2','긍정2(하)','부정2(하)',
-    '다면년도3','긍정3(상)','부정3(상)','다면년도3','긍정3(하)','부정3(하)',
-    '포상1','포상일1','포상2','포상일2','포상3','포상일3',
-    '징계1','징계일1','징계2','징계일2','징계3','징계일3',
-    '총경력','대웅/대웅제약','그룹사','타사','타사(경력회사명)'
-  ];
-  const d1=list.map(c=>{
-    const cr=c.career||{};const hasApp=c.application&&Object.keys(c.application).length>0;
-    return ['',toNum(c.sabun),'',fmtS(c.name),fmtS(c.company),fmtS(c.dept),fmtS(c.center),fmtS(c.team),fmtS(c.dept),'',
-      '',fmtS(c.currentJob),fmtS(c.criterion),fmtS(c.reviewType),fmtS(c.applyJob),fmtS(c.note),hasApp?'○':'',getCheoyong(c),
-      ...getJobHistory(c),...getDeptHistory(c),
-      '',getEval(c,2025),getEval(c,2024),getEval(c,2023),getEval(c,2022),getEval(c,2021),
-      ...getMultiEval(c),...getRwPn(c.rewards||[]),...getRwPn(c.penalties||[]),
-      fmtS(cr.total),fmtS(cr.daewong),fmtS(cr.group),fmtS(cr.outside),fmtS(cr.outsideCompany)];
-  });
-
-  /* ══ 시트2: 면접관_매핑 (업로드 파일① 시트2와 동일 양식) ══ */
-  const m2=new Array(25).fill(''); m2[10]='심층면접관';
-  const h2=['','사원 번호','(구)사번','성명','회사','본부/실','센터/사업부','팀/사무소','★본부','★구분',
+  /* ══ 헤더 (81열 — 원본 엑셀 ★직무심의기초자료_raw 양식과 동일) ══ */
+  const header = [
+    '구분',                // [0]
+    '사원 번호',           // [1]
+    '성명',                // [2]
+    '회사',                // [3]
+    '본부/실',             // [4]
+    '센터/사업부',         // [5]
+    '팀/사무소',           // [6]
+    '직책',                // [7]
+    '★본부',              // [8]
+    /* 면접관 5명 (사번·성명) [9]~[18] */
     '사번','성명','사번','성명','사번','성명','사번','성명','사번','성명',
-    '직책','현직무','심의기준','심의유형','최종지원직무'];
-  const d2=list.map(c=>{
-    const iv=buildIvPairs(c);
-    return ['',toNum(c.sabun),'',fmtS(c.name),fmtS(c.company),fmtS(c.dept),fmtS(c.center),fmtS(c.team),fmtS(c.dept),'',
-      ...iv.flatMap(p=>[toNum(p.s),fmtS(p.n)]),
-      '',fmtS(c.currentJob),fmtS(c.criterion),fmtS(c.reviewType),fmtS(c.applyJob)];
+    '현직무',              // [19]
+    '심의기준',            // [20]
+    '심의유형',            // [21]
+    '최종지원직무',        // [22]
+    '비고',                // [23]
+    'SOP성공',             // [24]
+    '멘토멘티or\nSOP리더', // [25]
+    '변화혁신\n과제',      // [26]
+    '변화혁신과제명',      // [27]
+    '채용구분',            // [28]
+    '직무확정일1','직무1','직무확정일2','직무2','직무확정일3','직무3', // [29]~[34]
+    '부서이동조직(현)','부서이동일(현)','부서이동조직(전)','부서이동일(전)', // [35]~[38]
+    '4분기평가',           // [39]
+    '2025년\n하반기',      // [40]
+    2025,                  // [41]
+    '2024년','2023년','2022년','2021년', // [42]~[45]
+    '다면년도1','긍정1(상)','부정1(상)','다면년도1','긍정1(하)','부정1(하)', // [46]~[51]
+    '다면년도2','긍정2(상)','부정2(상)','다면년도2','긍정2(하)','부정2(하)', // [52]~[57]
+    '다면년도3','긍정3(상)','부정3(상)','다면년도3','긍정3(하)','부정3(하)', // [58]~[63]
+    '포상1','포상일1','포상2','포상일2','포상3','포상일3', // [64]~[69]
+    '징계1','징계일1','징계2','징계일2','징계3','징계일3', // [70]~[75]
+    '총경력','대웅/대웅제약','그룹사','타사','타사(경력회사명)' // [76]~[80]
+  ];
+
+  /* ══ 데이터 행 생성 ══ */
+  const dataRows = list.map(c => {
+    const cr   = c.career || {};
+    const ev   = buildEvalMap(c);
+    const iv   = buildIvPairs(c);
+    const jh   = getJobHistory(c);     // 6칸
+    const dh   = getDeptHistory(c);    // 4칸
+    const me   = getMultiEval(c);      // 18칸
+    const rw   = getRwPn(c.rewards  || []); // 6칸
+    const pn   = getRwPn(c.penalties|| []); // 6칸
+
+    return [
+      '3. 영업',                                         // [0]  구분
+      toNum(c.sabun),                                     // [1]  사원 번호
+      fmtS(c.name),                                       // [2]  성명
+      fmtS(c.company),                                    // [3]  회사
+      fmtS(c.dept),                                       // [4]  본부/실
+      fmtS(c.center),                                     // [5]  센터/사업부
+      fmtS(c.team),                                       // [6]  팀/사무소
+      fmtS(c.position || c.직책 || ''),                   // [7]  직책
+      fmtS(c.dept),                                       // [8]  ★본부 (= 본부/실)
+      /* 면접관 5명 [9]~[18] */
+      ...iv.flatMap(p => [toNum(p.s), fmtS(p.n)]),
+      fmtS(c.currentJob),                                 // [19] 현직무
+      fmtS(c.criterion),                                  // [20] 심의기준
+      fmtS(c.reviewType),                                 // [21] 심의유형
+      fmtS(c.applyJob),                                   // [22] 최종지원직무
+      fmtS(c.note),                                       // [23] 비고
+      fmtS(c.sopSuccess   || c.SOP성공   || ''),          // [24] SOP성공
+      fmtS(c.mentorMenti  || c.멘토멘티  || ''),          // [25] 멘토멘티or SOP리더
+      fmtS(c.innovation   || c.변화혁신과제 || ''),       // [26] 변화혁신 과제
+      fmtS(c.innovationNm || c.변화혁신과제명 || ''),     // [27] 변화혁신과제명
+      getHireType(c),                                      // [28] 채용구분
+      /* 직무이력 [29]~[34] */
+      ...jh,
+      /* 부서이동 [35]~[38] */
+      ...dh,
+      /* 인사평가 [39]~[45] */
+      fmtS(c.q4eval || c.Q4평가 || ev['4분기'] || ''),   // [39] 4분기평가
+      ev['2025하'] || '',                                  // [40] 2025년 하반기
+      ev['2025']   || '',                                  // [41] 2025
+      ev['2024']   || '',                                  // [42] 2024년
+      ev['2023']   || '',                                  // [43] 2023년
+      ev['2022']   || '',                                  // [44] 2022년
+      ev['2021']   || '',                                  // [45] 2021년
+      /* 다면평가 [46]~[63] */
+      ...me,
+      /* 포상 [64]~[69] */
+      ...rw,
+      /* 징계 [70]~[75] */
+      ...pn,
+      /* 경력 [76]~[80] */
+      fmtS(cr.total), fmtS(cr.daewong), fmtS(cr.group),
+      fmtS(cr.outside), fmtS(cr.outsideCompany)
+    ];
   });
 
-  /* ── 워크북 생성 ── */
-  const wb=XLSX.utils.book_new();
-  const ws1=XLSX.utils.aoa_to_sheet([h1,...d1]);
-  ws1['!cols']=[
-    {wch:4},{wch:12},{wch:10},{wch:10},{wch:12},{wch:18},{wch:18},{wch:18},{wch:18},{wch:10},
-    {wch:8},{wch:12},{wch:12},{wch:12},{wch:16},{wch:20},{wch:8},{wch:10},
-    {wch:14},{wch:10},{wch:14},{wch:10},{wch:14},{wch:10},
-    {wch:28},{wch:14},{wch:28},{wch:14},
-    {wch:10},{wch:8},{wch:8},{wch:8},{wch:8},{wch:8},
-    {wch:8},{wch:8},{wch:8},{wch:8},{wch:8},{wch:8},
-    {wch:8},{wch:8},{wch:8},{wch:8},{wch:8},{wch:8},
-    {wch:8},{wch:8},{wch:8},{wch:8},{wch:8},{wch:8},
-    {wch:16},{wch:14},{wch:16},{wch:14},{wch:16},{wch:14},
-    {wch:16},{wch:14},{wch:16},{wch:14},{wch:16},{wch:14},
-    {wch:14},{wch:14},{wch:10},{wch:10},{wch:20}];
-  XLSX.utils.book_append_sheet(wb,ws1,'★지원자_리스트');
+  /* ── 워크북 생성 (단일 시트: ★직무심의기초자료_raw) ── */
+  const wb = XLSX.utils.book_new();
+  /* 빈 머지 헤더 행 2줄 (원본 양식과 동일) */
+  const emptyRow1 = new Array(header.length).fill(null);
+  const emptyRow2 = new Array(header.length).fill(null);
+  const ws = XLSX.utils.aoa_to_sheet([emptyRow1, emptyRow2, header, ...dataRows]);
 
-  const ws2=XLSX.utils.aoa_to_sheet([m2,h2,...d2]);
-  ws2['!merges']=[{s:{r:0,c:10},e:{r:0,c:19}}];
-  ws2['!cols']=[
-    {wch:4},{wch:12},{wch:10},{wch:10},{wch:10},{wch:16},{wch:16},{wch:16},{wch:16},{wch:10},
-    {wch:12},{wch:10},{wch:12},{wch:10},{wch:12},{wch:10},{wch:12},{wch:10},{wch:12},{wch:10},
-    {wch:8},{wch:16},{wch:12},{wch:12},{wch:18}];
-  XLSX.utils.book_append_sheet(wb,ws2,'면접관_매핑');
+  /* 사번 숫자 컬럼 처리 */
+  const numCols = new Set([1, 9, 11, 13, 15, 17]); // 사원번호 + 면접관사번 x5
+  const rng = XLSX.utils.decode_range(ws['!ref']);
+  for(let R=3; R<=rng.e.r; R++) {   // 데이터 행부터 (row3 = header 아래)
+    for(let C=rng.s.c; C<=rng.e.c; C++) {
+      const addr = XLSX.utils.encode_cell({r:R,c:C});
+      if(!ws[addr]) continue;
+      if(numCols.has(C)) {
+        const num = Number(ws[addr].v);
+        if(!isNaN(num) && ws[addr].v!=='' && ws[addr].v!==null) {
+          ws[addr].t='n'; ws[addr].v=num;
+        } else { ws[addr].t='s'; ws[addr].v=String(ws[addr].v||''); }
+      } else {
+        ws[addr].t='s';
+        ws[addr].v=(ws[addr].v===null||ws[addr].v===undefined)?'':String(ws[addr].v);
+      }
+    }
+  }
 
-  const d=new Date();
-  const ds=d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2);
-  XLSX.writeFile(wb, `직무급(영업)_지원자_리스트_${ds}.xlsx`);
+  /* 컬럼 너비 */
+  ws['!cols'] = [
+    {wch:10},  // 구분
+    {wch:12},  // 사원 번호
+    {wch:10},  // 성명
+    {wch:12},  // 회사
+    {wch:16},  // 본부/실
+    {wch:16},  // 센터/사업부
+    {wch:16},  // 팀/사무소
+    {wch:8},   // 직책
+    {wch:16},  // ★본부
+    {wch:12},{wch:10},{wch:12},{wch:10},{wch:12},{wch:10},{wch:12},{wch:10},{wch:12},{wch:10}, // 면접관x5
+    {wch:22},  // 현직무
+    {wch:16},  // 심의기준
+    {wch:16},  // 심의유형
+    {wch:22},  // 최종지원직무
+    {wch:24},  // 비고
+    {wch:10},  // SOP성공
+    {wch:16},  // 멘토멘티
+    {wch:10},  // 변화혁신과제
+    {wch:16},  // 변화혁신과제명
+    {wch:10},  // 채용구분
+    {wch:14},{wch:22},{wch:14},{wch:22},{wch:14},{wch:22}, // 직무이력x3
+    {wch:28},{wch:14},{wch:28},{wch:14}, // 부서이동x2
+    {wch:10},  // 4분기평가
+    {wch:10},{wch:8},{wch:8},{wch:8},{wch:8},{wch:8}, // 인사평가
+    {wch:8},{wch:8},{wch:8},{wch:8},{wch:8},{wch:8}, // 다면1
+    {wch:8},{wch:8},{wch:8},{wch:8},{wch:8},{wch:8}, // 다면2
+    {wch:8},{wch:8},{wch:8},{wch:8},{wch:8},{wch:8}, // 다면3
+    {wch:16},{wch:14},{wch:16},{wch:14},{wch:16},{wch:14}, // 포상x3
+    {wch:16},{wch:14},{wch:16},{wch:14},{wch:16},{wch:14}, // 징계x3
+    {wch:14},{wch:14},{wch:10},{wch:14},{wch:20} // 경력
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, '★직무심의기초자료_raw');
+
+  const d = new Date();
+  const ds = d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2);
+  XLSX.writeFile(wb, `직무급(영업)_직무심의기초자료_raw_${ds}.xlsx`);
 }
 
 /* ── 면접관 현황 단독 추출 ── */
