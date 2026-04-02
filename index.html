@@ -2260,8 +2260,9 @@ function exportRawExcel() {
   }
 
   /* 부서이동 최신 2건 → [org,date] x 2 */
+  /* 부서이동 — 업로드 시 현/전 순서 그대로 보존됨, 정렬하지 않음 */
   function getDeptHistory(c) {
-    const dh = (c.deptHistory||[]).slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
+    const dh = (c.deptHistory||[]).slice();
     const r = [];
     for(let i=0;i<2;i++) r.push(dh[i]?fmtS(dh[i].org):'', dh[i]?fmtS(dh[i].date):'');
     return r;
@@ -2580,9 +2581,9 @@ function exportExcel(mode) {
     const jh = (c.jobHistory||[]).slice(-3);
     while (jh.length<3) jh.unshift({date:'',job:''});
 
-    // 부서이력 (최근 2)
-    const dh = (c.deptHistory||[]).slice(-2);
-    while (dh.length<2) dh.unshift({date:'',org:''});
+    // 부서이력 (현/전 순서 보존)
+    const dh = (c.deptHistory||[]).slice(0,2);
+    while (dh.length<2) dh.push({date:'',org:''});
 
     // 포상/징계 (최대 3/3)
     const rr=(c.rewards||[]).slice(0,3); while(rr.length<3) rr.push({name:'',date:''});
@@ -2625,9 +2626,9 @@ function exportExcel(mode) {
     row[28] = jh[0].date||''; row[29] = jh[0].job||'';
     row[30] = jh[1].date||''; row[31] = jh[1].job||'';
     row[32] = jh[2].date||''; row[33] = jh[2].job||'';
-    // 부서이동 col34~37
-    row[34] = dh[1]?.org||''; row[35] = dh[1]?.date||'';
-    row[36] = dh[0]?.org||''; row[37] = dh[0]?.date||'';
+    // 부서이동 col34~37 (dh[0]=현, dh[1]=전)
+    row[34] = dh[0]?.org||''; row[35] = dh[0]?.date||'';
+    row[36] = dh[1]?.org||''; row[37] = dh[1]?.date||'';
     // 종합평가 col38~43
     row[38] = evalByYr['2025하']||'';
     row[39] = evalByYr['2025']||'';
@@ -5319,12 +5320,12 @@ async function uploadFile1() {
         if (d && jb) jobHistory.push({ date: fmtDate(d), job: String(jb) });
       }
 
-      /* 부서이력 */
+      /* 부서이력 — 현/전 위치 그대로 보존 (조직 빈값이어도 날짜 있으면 유지) */
       const deptHistory = [];
       const dOrg = r[col('부서이동조직(현)')], dDate = r[col('부서이동일(현)')];
-      if (dOrg) deptHistory.push({ date: fmtDate(dDate), org: String(dOrg) });
+      if (dOrg || dDate) deptHistory.push({ date: fmtDate(dDate), org: String(dOrg || '') });
       const dOrg2 = r[col('부서이동조직(전)')], dDate2 = r[col('부서이동일(전)')];
-      if (dOrg2) deptHistory.push({ date: fmtDate(dDate2), org: String(dOrg2) });
+      if (dOrg2 || dDate2) deptHistory.push({ date: fmtDate(dDate2), org: String(dOrg2 || '') });
 
       /* 연간평가 — 컬럼별 정확 매칭 (하반기/연간 구분) */
       const annualEval = [];
@@ -5344,18 +5345,22 @@ async function uploadFile1() {
         if (ci >= 0 && r[ci]) annualEval.push({ year: yr+'년', grade: String(r[ci]) });
       });
 
-      /* 다면평가 */
+      /* 다면평가 — 상/하 년도를 각각 독립적으로 읽기 (동일 헤더명 구분) */
       const multiEval = [];
-      for (let j = 1; j <= 3; j++) {
-        const yrU = r[col('다면년도'+j)];
-        if (!yrU) continue;
-        const yr = String(yrU);
-        const posU = pct(r[hdr.findIndex((h,idx) => h && String(h).includes('긍정'+j) && String(h).includes('상'))]);
-        const negU = pct(r[hdr.findIndex((h,idx) => h && String(h).includes('부정'+j) && String(h).includes('상'))]);
-        if (posU) multiEval.push({ year: yr, half:'상', pos: posU, neg: negU || '0' });
-        const posL = pct(r[hdr.findIndex((h,idx) => h && String(h).includes('긍정'+j) && String(h).includes('하'))]);
-        const negL = pct(r[hdr.findIndex((h,idx) => h && String(h).includes('부정'+j) && String(h).includes('하'))]);
-        if (posL) multiEval.push({ year: yr, half:'하', pos: posL, neg: negL || '0' });
+      /* 다면 시작 컬럼 찾기: 첫 '다면년도' 헤더 위치 */
+      const multiStart = hdr.findIndex(h => h && String(h).includes('다면년도'));
+      if (multiStart >= 0) {
+        for (let j = 0; j < 3; j++) {
+          const base = multiStart + j * 6; // 슬롯당 6칸: 년도상,긍정상,부정상,년도하,긍정하,부정하
+          const yrUpper = String(r[base] || '');     // 상반기 년도
+          const yrLower = String(r[base+3] || '');   // 하반기 년도
+          const posU = pct(r[base+1]);               // 긍정(상)
+          const negU = pct(r[base+2]);               // 부정(상)
+          const posL = pct(r[base+3+1]);             // 긍정(하)
+          const negL = pct(r[base+3+2]);             // 부정(하)
+          if (yrUpper && yrUpper !== '0' && posU) multiEval.push({ year: yrUpper, half:'상', pos: posU, neg: negU || '' });
+          if (yrLower && yrLower !== '0' && posL) multiEval.push({ year: yrLower, half:'하', pos: posL, neg: negL || '' });
+        }
       }
 
       /* 포상/징계 */
