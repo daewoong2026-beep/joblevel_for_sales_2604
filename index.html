@@ -2363,7 +2363,7 @@ function exportRawExcel() {
       fmtS(c.center),                                     // [5]  센터/사업부
       fmtS(c.team),                                       // [6]  팀/사무소
       fmtS(c.position || c.직책 || ''),                   // [7]  직책
-      fmtS(c.dept),                                       // [8]  ★본부 (= 본부/실)
+      fmtS(c.bonbu || c.dept),                              // [8]  ★본부
       /* 면접관 5명 [9]~[18] */
       ...iv.flatMap(p => [toNum(p.s), fmtS(p.n)]),
       fmtS(c.currentJob),                                 // [19] 현직무
@@ -2616,7 +2616,7 @@ function exportExcel(mode) {
     row[5]  = c.dept||'';
     row[6]  = c.center||'';
     row[7]  = c.team||'';
-    row[8]  = c.dept||'';   // ★본부
+    row[8]  = c.bonbu || c.dept || '';   // ★본부
     row[9]  = '';           // ★구분
     // 면접관 col10~19
     for (let k=0;k<5;k++) {
@@ -5315,7 +5315,7 @@ async function uploadFile1() {
   st.textContent = '처리 중…';
   try {
     const ab = await fi.files[0].arrayBuffer();
-    const wb = XLSX.read(ab, { type:'array', cellDates:true });
+    const wb = XLSX.read(ab, { type:'array' });
 
     /* ── 시트1: 지원자 기본정보 ── */
     const mainSheet = wb.SheetNames.find(n => n.includes('클로드') || n.includes('비영업') || n.includes('영업')) || wb.SheetNames[0];
@@ -5333,7 +5333,21 @@ async function uploadFile1() {
       const sabun = String(r[col('사원번호')] || '').trim();
       if (!sabun || sabun === '0') continue;
 
-      const fmtDate = (v) => { if (!v) return ''; if (v instanceof Date) { const y=v.getFullYear(), m=String(v.getMonth()+1).padStart(2,'0'), d=String(v.getDate()).padStart(2,'0'); return y+'-'+m+'-'+d; } return String(v).slice(0,10); };
+      /* ── 날짜 변환: Excel serial → YYYY-MM-DD (타임존 무관) ── */
+      const fmtDate = (v) => {
+        if (!v) return '';
+        if (typeof v === 'number' && v > 30000 && v < 70000) {
+          const d = new Date(Math.round((v - 25569) * 86400000));
+          return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
+        }
+        if (v instanceof Date) {
+          const d = new Date(v.getTime() + v.getTimezoneOffset()*60000);
+          return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
+        }
+        const s = String(v).trim();
+        if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(s)) return s.slice(0,10);
+        return s;
+      };
       const pct = (v) => { if (!v && v !== 0) return ''; return String(v).trim(); };
 
       /* 직무이력 */
@@ -5416,6 +5430,7 @@ async function uploadFile1() {
         dept: String(r[col('본부/실')] || r[col('본부')] || ''),
         center: String(r[col('센터/사업부')] || ''),
         team: String(r[col('팀/사무소')] || r[col('팀')] || ''),
+        bonbu: String(r[col('★본부')] || r[col('본부/실')] || ''),
         position: String(r[col('직책')] || ''),
         currentJob: String(r[col('현직무')] || ''),
         applyJob: String(r[col('최종지원직무')] || ''),
