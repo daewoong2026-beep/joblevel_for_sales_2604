@@ -77,16 +77,17 @@ body {
 }
 /* ══ 보안: 관리자 페이지는 admin-mode 클래스 없이는 절대 표시되지 않음 ══ */
 body:not(.admin-mode) #page-admin { display: none !important; }
-/* ══ 페이지 겹침 방지 ══ */
+/* ══ 페이지 레이아웃: 뷰포트 고정 + 내부 스크롤 ══ */
 .page.active {
-  position: relative;
   z-index: 10;
-  overflow-y: auto;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
-#page-admin.active { overflow: auto; }
+#page-admin.active { overflow: hidden; }
 input, textarea, select, button { font-family: var(--font-main) !important; }
 
-.page { display:none; min-height:100vh; }
+.page { display:none; }
 .page.active { display:flex; flex-direction:column; }
 
 /* ── LOADING ── */
@@ -338,12 +339,10 @@ input, textarea, select, button { font-family: var(--font-main) !important; }
 .btn-logout:hover { background:rgba(249,115,22,.25); color:var(--white); border-color:rgba(249,115,22,.5); }
 
 /* ── SHELL ── */
-.shell { display:flex; flex:1; min-width:0; overflow-x:hidden; overflow-y:auto; background:var(--bg); color:var(--g900); }
+.shell { display:flex; flex:1; min-width:0; min-height:0; overflow:hidden; background:var(--bg); color:var(--g900); }
 .sidebar {
   width:var(--sidebar-w); background:var(--white);
   border-right:1px solid var(--g200); flex-shrink:0; overflow-y:auto;
-  position:sticky; top:var(--topbar-h); align-self:flex-start;
-  max-height:calc(100dvh - var(--topbar-h));
   box-shadow:2px 0 8px rgba(249,115,22,.04);
 }
 .sidebar-hdr {
@@ -365,11 +364,9 @@ input, textarea, select, button { font-family: var(--font-main) !important; }
 .sb-job  { font-size:0.69rem; color:var(--pr-400); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .sb-item.active .sb-name { color:var(--pr-700); }
 .sb-item.active .sb-job  { color:var(--pr-500); }
-.main-content { flex:1; min-width:0; overflow-y:auto; overflow-x:auto; min-height:calc(100vh - var(--topbar-h)); }
+.main-content { flex:1; min-width:0; min-height:0; overflow-y:auto; overflow-x:auto; }
 #page-review .main-content {
-  height: calc(100dvh - var(--topbar-h) - 3px);  /* 3px = progress bar */
   overflow-y: auto;
-  min-height: unset;
 }
 
 /* ── LIST PAGE ── */
@@ -893,6 +890,8 @@ input, textarea, select, button { font-family: var(--font-main) !important; }
 /* Grade chips */
 .grade-row { display:flex; gap:8px; flex-wrap:wrap; }
 .g-chip { border-radius:8px; padding:5px 10px; text-align:center; min-width:clamp(44px,4.5vw,60px); border:1.5px solid var(--g300); background:var(--g100); transition:transform .15s; }
+.g-chip.g-q4 { border:1.5px dashed var(--pr-400); background:var(--pr-50); opacity:.75; }
+.g-chip.g-q4 .g-yr { color:var(--pr-600); font-style:italic; }
 .g-chip:hover { transform:translateY(-2px); }
 .g-chip .g-yr { font-size:0.625rem; color:var(--g500); }
 .g-chip .g-gr { display:block; font-size:1.125rem; font-weight:700; margin-top:2px; line-height:1.1; }
@@ -1268,12 +1267,12 @@ input, textarea, select, button { font-family: var(--font-main) !important; }
 /* ── ADMIN PAGE ── */
 #page-admin {
   flex-direction:column;
-  min-height:100dvh;
-  overflow:auto;
+  height:100dvh;
+  overflow:hidden;
 }
 .admin-topbar { height:var(--topbar-h); background:var(--dark); border-bottom:1px solid rgba(249,115,22,.2); display:flex; align-items:center; padding:0 clamp(12px,2vw,24px); gap:clamp(8px,1.5vw,14px); position:sticky; top:0; z-index:210; flex-shrink:0; position:sticky; top:0; z-index:210; flex-shrink:0; box-shadow:0 2px 12px rgba(28,16,7,.2); }
 .admin-badge { background:rgba(249,115,22,.2); border:1px solid rgba(249,115,22,.4); border-radius:6px; padding:3px 10px; font-size:0.69rem; font-weight:700; color:var(--pr-300); letter-spacing:.5px; }
-.admin-shell   { display:flex; flex:1; min-height:0; overflow:auto; min-width:0; }
+.admin-shell   { display:flex; flex:1; min-height:0; overflow:hidden; min-width:0; }
 .admin-sidebar { display:none; } /* 사이드바 숨김 — 상단 탭으로 대체 */
 .admin-tab-nav {
   position:sticky; top:var(--topbar-h); z-index:190;
@@ -1292,7 +1291,7 @@ input, textarea, select, button { font-family: var(--font-main) !important; }
 .admin-tab-item:hover  { color:var(--pr-600); background:var(--pr-50); border-radius:6px 6px 0 0; }
 .admin-tab-item.active { color:var(--pr-700); border-bottom-color:var(--pr-500); font-weight:700; }
 .admin-menu-item { display:none; } /* 호환성 유지 */
-.admin-shell { display:flex; flex-direction:column; flex:1; overflow:auto; min-height:calc(100dvh - var(--topbar-h)); min-width:0; }
+.admin-shell { display:flex; flex-direction:column; flex:1; overflow:hidden; min-height:0; min-width:0; }
 .admin-main  { flex:1; min-width:0; min-height:0; width:100%; padding:var(--page-pad); overflow-y:auto; overflow-x:hidden; background:var(--bg); }
 .admin-panel { display:none; }
 .admin-panel.active { display:block; }
@@ -2211,15 +2210,16 @@ function exportRawExcel() {
   const fmtS = v => (v==null?'':String(v));
   const toNum = v => { const n=Number(v); return(!isNaN(n)&&v!==''&&v!==null)?n:fmtS(v); };
 
-  /* 연간평가: year키 정규화 후 정확 매칭 (4분기/2025하 vs 2025 구분) */
+  /* 연간평가: year키 정규화 후 정확 매칭 (4분기 구분) */
   function buildEvalMap(c) {
     const m = {};
     (c.annualEval||[]).forEach(e => {
       const raw = String(e.year||'').trim();
       /* 4분기평가는 별도 키로 보존 */
       if (raw === '4분기') { if (!m['4분기']) m['4분기'] = fmtS(e.grade); return; }
-      /* "2025하" → "2025하", "2025년" → "2025", "2025하반기" → "2025하" */
-      const key = raw.replace(/년$/,'').replace(/반기$/,'').replace(/[^0-9하]/g,'');
+      /* "2025_4Q" → "2025_4Q", "2025년" → "2025" */
+      if (raw === '2025_4Q') { if (!m['2025_4Q']) m['2025_4Q'] = fmtS(e.grade); return; }
+      const key = raw.replace(/년$/,'').replace(/[^0-9]/g,'');
       if (key && !m[key]) m[key] = fmtS(e.grade);
     });
     return m;
@@ -2337,7 +2337,7 @@ function exportRawExcel() {
     '직무확정일1','직무1','직무확정일2','직무2','직무확정일3','직무3', // [29]~[34]
     '부서이동조직(현)','부서이동일(현)','부서이동조직(전)','부서이동일(전)', // [35]~[38]
     '4분기평가',           // [39]
-    '2025년\n하반기',      // [40]
+    '2025년\n4분기',       // [40]
     2025,                  // [41]
     '2024년','2023년','2022년','2021년', // [42]~[45]
     '다면년도1','긍정1(상)','부정1(상)','다면년도1','긍정1(하)','부정1(하)', // [46]~[51]
@@ -2387,7 +2387,7 @@ function exportRawExcel() {
       ...dh,
       /* 인사평가 [39]~[45] */
       fmtS(c.q4eval || c.Q4평가 || ev['4분기'] || ''),   // [39] 4분기평가
-      ev['2025하'] || '',                                  // [40] 2025년 하반기
+      ev['2025_4Q'] || '',                                 // [40] 2025년 4분기
       ev['2025']   || '',                                  // [41] 2025
       ev['2024']   || '',                                  // [42] 2024년
       ev['2023']   || '',                                  // [43] 2023년
@@ -2603,7 +2603,7 @@ function exportExcel(mode) {
     '채용구분',  // col27
     '직무확정일1','직무1','직무확정일2','직무2','직무확정일3','직무3', // col28~33
     '부서이동조직(현)','부서이동일(현)','부서이동조직(전)','부서이동일(전)', // col34~37
-    '2025년\n하반기','2025','2024년','2023년','2022년','2021년', // col38~43
+    '2025년\n4분기','2025','2024년','2023년','2022년','2021년', // col38~43
     // 다면평가 3년도 x 상하
     '다면년도1','긍정1(상)','부정1(상)','다면년도1','긍정1(하)','부정1(하)',  // col44~49
     '다면년도2','긍정2(상)','부정2(상)','다면년도2','긍정2(하)','부정2(하)',  // col50~55
@@ -2615,10 +2615,12 @@ function exportExcel(mode) {
 
   /* ── 데이터 행 ── */
   const dataRows = list.map(c => {
-    // 연간평가: year 값 "2025년"→"2025", "2025하"→"2025하" 정규화
+    // 연간평가: year 값 정규화
     const evalByYr = {};
     (c.annualEval||[]).forEach(e => {
-      evalByYr[String(e.year).replace(/[^0-9하]/g,'')] = e.grade;
+      const raw = String(e.year||'').trim();
+      if (raw === '2025_4Q' || raw === '4분기') { evalByYr[raw] = e.grade; return; }
+      evalByYr[raw.replace(/[^0-9]/g,'')] = e.grade;
     });
 
     // 다면평가: year는 숫자 문자열("2025"), half는 "상"/"하"
@@ -2675,7 +2677,7 @@ function exportExcel(mode) {
     row[34] = dh[0]?.org||''; row[35] = dh[0]?.date||'';
     row[36] = dh[1]?.org||''; row[37] = dh[1]?.date||'';
     // 종합평가 col38~43
-    row[38] = evalByYr['2025하']||'';
+    row[38] = evalByYr['2025_4Q']||'';
     row[39] = evalByYr['2025']||'';
     row[40] = evalByYr['2024']||'';
     row[41] = evalByYr['2023']||'';
@@ -3143,6 +3145,22 @@ function shiftMf(dir) {
 }
 
 /* ══════════════════════════════════════════════
+   종합평가 표시 헬퍼 (전역)
+══════════════════════════════════════════════ */
+function fmtEvalYear(yr) {
+  if (yr === '2025_4Q') return '25년 4분기';
+  if (yr === '4분기') return '25년 4분기';
+  return yr;
+}
+function isQ4(yr) { return yr === '2025_4Q' || yr === '4분기'; }
+function evalSortKey(yr) {
+  if (yr === '2025_4Q') return '2025.5';
+  if (yr === '4분기') return '2025.4';
+  const m = String(yr).match(/(\d{4})/);
+  return m ? m[1] : yr;
+}
+
+/* ══════════════════════════════════════════════
    RENDER CANDIDATE
 ══════════════════════════════════════════════ */
 function renderCandidate(idx) {
@@ -3150,9 +3168,10 @@ function renderCandidate(idx) {
   mfIdx = 0;
 
   /* 종합평가 */
-  const evalH = (c.annualEval||[]).sort((a,b)=>a.year-b.year).map(e=>`
-    <div class="g-chip ${gradeClass(e.grade)}">
-      <div class="g-yr">${e.year}</div>
+  const sortedEval = (c.annualEval||[]).slice().sort((a,b)=>evalSortKey(a.year).localeCompare(evalSortKey(b.year)));
+  const evalH = sortedEval.map(e=>`
+    <div class="g-chip ${gradeClass(e.grade)}${isQ4(e.year)?' g-q4':''}">
+      <div class="g-yr">${fmtEvalYear(e.year)}</div>
       <strong class="g-gr">${(e.grade||'').trim()||'—'}</strong>
     </div>`).join('');
 
@@ -3339,19 +3358,40 @@ function initCharts(c) {
 
   const gradeNum = g => gradeToNum(g);  /* 전역 7점 척도 사용 (S=7 … D=1) */
 
-  /* 종합평가 차트 */
-  const ann = (c.annualEval||[]).sort((a,b)=>a.year-b.year);
-  if (ann.length && $('chart-annual')) {
+  /* 종합평가 차트 — 4분기는 점선 + 삼각 마커로 구분 */
+  const sortedEval = (c.annualEval||[]).slice().sort((a,b)=>evalSortKey(a.year).localeCompare(evalSortKey(b.year)));
+  const annRegular = sortedEval.filter(e=>!isQ4(e.year));
+  const annQ4      = sortedEval.filter(e=>isQ4(e.year));
+  const annAll     = [...annRegular, ...annQ4];
+  if (annAll.length && $('chart-annual')) {
+    const datasets = [{
+      label:'종합평가', data: annRegular.map(e=>gradeNum(e.grade)),
+      borderColor:'#f97316', backgroundColor:'rgba(249,115,22,.1)',
+      pointBackgroundColor:'#f97316', pointRadius:5,
+      tension:.35, fill:true, spanGaps:false
+    }];
+    /* 4분기 데이터가 있으면 별도 데이터셋으로 추가 */
+    if (annQ4.length) {
+      /* 연결선: 마지막 정규 데이터 → 4분기 */
+      const bridgeData = annRegular.map(()=>null);
+      if (annRegular.length) bridgeData[annRegular.length-1] = gradeNum(annRegular[annRegular.length-1].grade);
+      annQ4.forEach(e => bridgeData.push(gradeNum(e.grade)));
+      datasets.push({
+        label:'4분기', data: bridgeData,
+        borderColor:'#fb923c', borderDash:[6,4],
+        backgroundColor:'transparent',
+        pointBackgroundColor: bridgeData.map((v,i) => i >= annRegular.length && v != null ? '#fb923c' : 'transparent'),
+        pointBorderColor: bridgeData.map((v,i) => i >= annRegular.length && v != null ? '#fb923c' : 'transparent'),
+        pointRadius: bridgeData.map((v,i) => i >= annRegular.length && v != null ? 6 : 0),
+        pointStyle: 'triangle',
+        tension:.35, fill:false, spanGaps:true
+      });
+    }
     chartAnnual = new Chart($('chart-annual'), {
       type:'line',
       data:{
-        labels: ann.map(e=>e.year+'년'),
-        datasets:[{
-          label:'종합평가', data: ann.map(e=>gradeNum(e.grade)),
-          borderColor:'#f97316', backgroundColor:'rgba(249,115,22,.1)',
-          pointBackgroundColor:'#f97316', pointRadius:5,
-          tension:.35, fill:true, spanGaps:false  // ★ spanGaps:false → null 구간 선 끊김
-        }]
+        labels: [...annRegular.map(e=>fmtEvalYear(e.year)), ...annQ4.map(e=>fmtEvalYear(e.year))],
+        datasets
       },
       options: chartOpts()
     });
@@ -5411,14 +5451,18 @@ async function uploadFile1() {
       const dOrg2 = r[col('부서이동조직(전)')], dDate2 = r[col('부서이동일(전)')];
       if (dOrg2 || dDate2) deptHistory.push({ date: fmtDate(dDate2), org: String(dOrg2 || '') });
 
-      /* 연간평가 — 컬럼별 정확 매칭 (하반기/연간 구분) */
+      /* 연간평가 — 컬럼별 정확 매칭 (4분기/연간 구분) */
       const annualEval = [];
       /* 4분기평가 */
       const q4Idx = hdr.findIndex(h => h && String(h).replace(/\s/g,'').includes('4분기평가'));
       if (q4Idx >= 0 && r[q4Idx]) annualEval.push({ year: '4분기', grade: String(r[q4Idx]) });
-      /* 2025년 하반기 */
-      const halfIdx = hdr.findIndex(h => h && String(h).replace(/\s/g,'').includes('하반기'));
-      if (halfIdx >= 0 && r[halfIdx]) annualEval.push({ year: '2025하', grade: String(r[halfIdx]) });
+      /* 2025년 4분기 (또는 하반기 — 양쪽 헤더 모두 지원) */
+      const qIdx = hdr.findIndex(h => {
+        if (!h) return false;
+        const s = String(h).replace(/\s/g,'');
+        return s.includes('4분기') && !s.includes('4분기평가') || s.includes('하반기');
+      });
+      if (qIdx >= 0 && r[qIdx]) annualEval.push({ year: '2025_4Q', grade: String(r[qIdx]) });
       /* 2025~2021 연간: '하반기'/'4분기' 컬럼 제외하고 매칭 */
       [2025, 2024, 2023, 2022, 2021].forEach(yr => {
         const ci = hdr.findIndex((h, idx) => {
