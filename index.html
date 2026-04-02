@@ -2226,21 +2226,36 @@ function exportRawExcel() {
     return m;
   }
 
-  /* 다면평가 3년도 (최신순), 각 년도별 상·하 6칸 */
+  /* 다면평가 — 슬롯 기반 복원 (원본 위치 보존, slot 속성 사용) */
   function getMultiEval(c) {
     const me = c.multiEval||[];
-    const years = [...new Set(me.map(e=>String(e.year)))].sort((a,b)=>Number(b)-Number(a)).slice(0,3);
-    while(years.length<3) years.push(null);
+    const hasSlot = me.length > 0 && me[0].slot != null;
     const r = [];
-    years.forEach(yr => {
-      if(!yr){ r.push('','','','','',''); return; }
-      const s = me.find(e=>String(e.year)===yr && e.half==='상');
-      const h = me.find(e=>String(e.year)===yr && e.half==='하');
-      r.push(
-        s ? yr : '0', s ? fmtS(s.pos) : '', s ? fmtS(s.neg) : '',
-        h ? yr : '0', h ? fmtS(h.pos) : '', h ? fmtS(h.neg) : ''
-      );
-    });
+
+    if (hasSlot) {
+      /* slot 속성으로 정확한 위치 복원 */
+      for (let slot = 1; slot <= 3; slot++) {
+        const s = me.find(e => e.slot === slot && e.half === '상');
+        const h = me.find(e => e.slot === slot && e.half === '하');
+        r.push(
+          s ? fmtS(s.year) : '0', s ? fmtS(s.pos) : '', s ? fmtS(s.neg) : '',
+          h ? fmtS(h.year) : '0', h ? fmtS(h.pos) : '', h ? fmtS(h.neg) : ''
+        );
+      }
+    } else {
+      /* 레거시: slot 없으면 년도 기준 내림차순 (기존 데이터 호환) */
+      const years = [...new Set(me.map(e=>String(e.year)))].sort((a,b)=>Number(b)-Number(a)).slice(0,3);
+      while(years.length<3) years.push(null);
+      years.forEach(yr => {
+        if(!yr){ r.push('0','','','0','',''); return; }
+        const s = me.find(e=>String(e.year)===yr && e.half==='상');
+        const h = me.find(e=>String(e.year)===yr && e.half==='하');
+        r.push(
+          s ? yr : '0', s ? fmtS(s.pos) : '', s ? fmtS(s.neg) : '',
+          h ? yr : '0', h ? fmtS(h.pos) : '', h ? fmtS(h.neg) : ''
+        );
+      });
+    }
     return r;
   }
 
@@ -2572,11 +2587,6 @@ function exportExcel(mode) {
     });
 
     // 다면평가: year는 숫자 문자열("2025"), half는 "상"/"하"
-    const multiByKey = {};
-    (c.multiEval||[]).forEach(e => {
-      multiByKey[String(e.year)+'_'+e.half] = {pos:e.pos||'', neg:e.neg||''};
-    });
-
     // 직무이력 (최대 3)
     const jh = (c.jobHistory||[]).slice(-3);
     while (jh.length<3) jh.unshift({date:'',job:''});
@@ -2589,9 +2599,9 @@ function exportExcel(mode) {
     const rr=(c.rewards||[]).slice(0,3); while(rr.length<3) rr.push({name:'',date:''});
     const pp=(c.penalties||[]).slice(0,3); while(pp.length<3) pp.push({name:'',date:''});
 
-    // 다면 3개 년도 (최신순)
-    const mYrs = [...new Set((c.multiEval||[]).map(e=>String(e.year)))].sort().reverse().slice(0,3);
-    while(mYrs.length<3) mYrs.push('');
+    // 다면평가: slot 기반 복원
+    const meArr = c.multiEval||[];
+    const meHasSlot = meArr.length > 0 && meArr[0].slot != null;
 
     // 면접관 5명 (INTERVIEWER_MAP 역방향)
     const ivs = getIvPairs(c.sabun);
@@ -2636,14 +2646,27 @@ function exportExcel(mode) {
     row[41] = evalByYr['2023']||'';
     row[42] = evalByYr['2022']||'';
     row[43] = evalByYr['2021']||'';
-    // 다면평가 3년도 col44~61
+    // 다면평가 3슬롯 col44~61
     for (let k=0;k<3;k++) {
-      const yr=mYrs[k]||'';
-      const bs=yr?((multiByKey[yr+'_상'])||{pos:'',neg:''}):{}; 
-      const bh=yr?((multiByKey[yr+'_하'])||{pos:'',neg:''}):{}; 
       const base=44+k*6;
-      row[base]  =yr; row[base+1]=bs.pos||''; row[base+2]=bs.neg||'';
-      row[base+3]=yr; row[base+4]=bh.pos||''; row[base+5]=bh.neg||'';
+      if (meHasSlot) {
+        const slot = k+1;
+        const s = meArr.find(e => e.slot === slot && e.half === '상');
+        const h = meArr.find(e => e.slot === slot && e.half === '하');
+        row[base]  = s ? String(s.year) : '0'; row[base+1] = s ? (s.pos||'') : ''; row[base+2] = s ? (s.neg||'') : '';
+        row[base+3]= h ? String(h.year) : '0'; row[base+4] = h ? (h.pos||'') : ''; row[base+5] = h ? (h.neg||'') : '';
+      } else {
+        /* 레거시: year 기반 */
+        const multiByKey = {};
+        meArr.forEach(e => { multiByKey[String(e.year)+'_'+e.half] = {pos:e.pos||'', neg:e.neg||''}; });
+        const mYrs = [...new Set(meArr.map(e=>String(e.year)))].sort().reverse().slice(0,3);
+        while(mYrs.length<3) mYrs.push('');
+        const yr=mYrs[k]||'';
+        const bs=yr?((multiByKey[yr+'_상'])||{pos:'',neg:''}):{}; 
+        const bh=yr?((multiByKey[yr+'_하'])||{pos:'',neg:''}):{}; 
+        row[base]  =yr||'0'; row[base+1]=bs.pos||''; row[base+2]=bs.neg||'';
+        row[base+3]=yr||'0'; row[base+4]=bh.pos||''; row[base+5]=bh.neg||'';
+      }
     }
     // 포상 col62~67
     for(let k=0;k<3;k++){row[62+k*2]=rr[k].name||'';row[63+k*2]=rr[k].date||'';}
@@ -5345,21 +5368,26 @@ async function uploadFile1() {
         if (ci >= 0 && r[ci]) annualEval.push({ year: yr+'년', grade: String(r[ci]) });
       });
 
-      /* 다면평가 — 상/하 년도를 각각 독립적으로 읽기 (동일 헤더명 구분) */
+      /* 다면평가 — 슬롯 단위로 저장 (원본 위치 보존) */
       const multiEval = [];
       /* 다면 시작 컬럼 찾기: 첫 '다면년도' 헤더 위치 */
       const multiStart = hdr.findIndex(h => h && String(h).includes('다면년도'));
       if (multiStart >= 0) {
         for (let j = 0; j < 3; j++) {
           const base = multiStart + j * 6; // 슬롯당 6칸: 년도상,긍정상,부정상,년도하,긍정하,부정하
-          const yrUpper = String(r[base] || '');     // 상반기 년도
-          const yrLower = String(r[base+3] || '');   // 하반기 년도
-          const posU = pct(r[base+1]);               // 긍정(상)
-          const negU = pct(r[base+2]);               // 부정(상)
-          const posL = pct(r[base+3+1]);             // 긍정(하)
-          const negL = pct(r[base+3+2]);             // 부정(하)
-          if (yrUpper && yrUpper !== '0' && posU) multiEval.push({ year: yrUpper, half:'상', pos: posU, neg: negU || '' });
-          if (yrLower && yrLower !== '0' && posL) multiEval.push({ year: yrLower, half:'하', pos: posL, neg: negL || '' });
+          const yrUpper = String(r[base] || '').trim();
+          const yrLower = String(r[base+3] || '').trim();
+          const posU = pct(r[base+1]);
+          const negU = pct(r[base+2]);
+          const posL = pct(r[base+4]);
+          const negL = pct(r[base+5]);
+          /* slot 번호를 저장하여 export 시 정확한 위치 복원 */
+          if (yrUpper && yrUpper !== '0' && posU) {
+            multiEval.push({ year: yrUpper, half:'상', pos: posU, neg: negU || '', slot: j+1 });
+          }
+          if (yrLower && yrLower !== '0' && posL) {
+            multiEval.push({ year: yrLower, half:'하', pos: posL, neg: negL || '', slot: j+1 });
+          }
         }
       }
 
