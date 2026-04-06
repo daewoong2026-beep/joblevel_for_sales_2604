@@ -1280,6 +1280,7 @@ input, textarea, select, button { font-family: var(--font-main) !important; }
   display:flex; align-items:center; gap:2px;
   padding:0 16px;
   box-shadow:0 2px 8px rgba(0,0,0,.06);
+  flex-shrink:0;
 }
 .admin-tab-item {
   padding:12px 18px; cursor:pointer;
@@ -1514,7 +1515,7 @@ input, textarea, select, button { font-family: var(--font-main) !important; }
     </div>
   </div>
 
-  <div class="shell" style="display:block">
+  <div class="shell" style="flex-direction:column">
     <!-- confirm 페이지: 사이드바 숨김 — 테이블이 전체 너비 활용 -->
     <div class="sidebar" style="display:none">
       <div class="sidebar-hdr">지원자 목록<div class="sidebar-count" id="sb-count-c"></div></div>
@@ -1664,7 +1665,7 @@ input, textarea, select, button { font-family: var(--font-main) !important; }
   <div class="admin-tab-nav">
       <div class="admin-tab-item active" id="atab-list"    onclick="switchAdminPanel('panel-list',this)">📋 전체 지원자 목록</div>
       <div class="admin-tab-item"        id="atab-info"    onclick="switchAdminPanel('panel-info',this)">🏷️ 기본 정보 수정</div>
-      <div class="admin-tab-item"        id="atab-app"     onclick="switchAdminPanel('panel-app',this)">📝 지원서 수정</div>
+      <div class="admin-tab-item"        id="atab-app"     onclick="switchAdminPanel('panel-app',this)">📝 지원서 / 직무급 수정</div>
       <div class="admin-tab-item"        id="atab-insight" onclick="switchAdminPanel('panel-insight',this)">📊 인사이트</div>
       <div class="admin-tab-item"        id="atab-raw"     onclick="switchAdminPanel('panel-raw',this)">📥 로우파일 추출</div>
       <div class="admin-tab-item"        id="atab-upload"  onclick="switchAdminPanel('panel-upload',this)">📤 데이터 업로드</div>
@@ -1945,20 +1946,31 @@ input, textarea, select, button { font-family: var(--font-main) !important; }
 
       <!-- 패널2: 지원서 수정 -->
       <div id="panel-app" class="admin-panel">
-        <div class="admin-panel-title">지원서 내용 수정</div>
-        <div class="admin-panel-sub">지원자를 선택하고 직무급 지원서 항목을 수정합니다. 저장 시 Google Sheets에 반영됩니다.</div>
+        <div class="admin-panel-title">지원서 / 직무급 수정</div>
+        <div class="admin-panel-sub">지원자를 선택하고 지원 직무급 및 지원서 항목을 수정합니다. 저장 시 Supabase DB에 반영되며 면접관 화면에 자동 갱신됩니다.</div>
         <div class="admin-select-row">
           <select class="admin-select" id="admin-cand-sel-app" onchange="loadAdminApp()"><option value="">-- 지원자 선택 --</option></select>
           <button class="btn-admin btn-admin-secondary" onclick="loadAdminApp()">불러오기</button>
         </div>
         <div id="admin-app-form" style="display:none">
           <div class="admin-form-section">
-            <div class="admin-form-section-title">📋 기본 정보 <span style="font-size:0.69rem;color:var(--g500);font-weight:400">(읽기 전용)</span></div>
+            <div class="admin-form-section-title">📋 기본 정보</div>
             <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">
               <div class="ic"><div class="lbl">사번</div><div class="val" id="aed-sabun">—</div></div>
               <div class="ic"><div class="lbl">성명</div><div class="val" id="aed-name">—</div></div>
               <div class="ic"><div class="lbl">현 직무</div><div class="val" id="aed-cur">—</div></div>
-              <div class="ic"><div class="lbl">지원 직무</div><div class="val accent" id="aed-apply">—</div></div>
+            </div>
+          </div>
+          <div class="admin-form-section">
+            <div class="admin-form-section-title">🔄 지원 직무급 변경</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px">
+              <div class="admin-field">
+                <label class="admin-label">지원 직무 / 단계</label>
+                <input class="admin-input" id="aed-applyJob" placeholder="예) 영업 C, 잡멘토 A 등">
+              </div>
+            </div>
+            <div style="margin-top:6px;font-size:0.72rem;color:var(--g400);line-height:1.6">
+              💡 지원 직무급을 변경하면 면접관 심의 화면의 헤더·기본정보·대시보드에 즉시 반영됩니다.
             </div>
           </div>
           <div class="admin-form-section">
@@ -1972,7 +1984,7 @@ input, textarea, select, button { font-family: var(--font-main) !important; }
           </div>
           <div style="display:flex;gap:10px;justify-content:flex-end">
             <button class="btn-admin btn-admin-secondary" onclick="loadAdminApp()">초기화</button>
-            <button class="btn-admin btn-admin-primary" onclick="saveAdminApp()">💾 저장 (Sheets 반영)</button>
+            <button class="btn-admin btn-admin-primary" onclick="saveAdminApp()">💾 저장 (직무급 + 지원서 DB 반영)</button>
           </div>
         </div>
       </div>
@@ -4790,7 +4802,8 @@ function loadAdminApp(){
   const c=candidates[idx];
   $('admin-app-form').style.display='block';
   $('aed-sabun').textContent=c.sabun; $('aed-name').textContent=c.name;
-  $('aed-cur').textContent=c.currentJob; $('aed-apply').textContent=c.applyJob;
+  $('aed-cur').textContent=c.currentJob||'—';
+  $('aed-applyJob').value=c.applyJob||'';
   const app=c.application||{};
   $('aed-q1').value=app.q1||app['1. 상황']||''; $('aed-q2').value=app.q2||app['2. 과제']||'';
   $('aed-q3').value=app.q3||app['3. 목표']||''; $('aed-q4').value=app.q4||app['4. 전략']||'';
@@ -4800,11 +4813,18 @@ async function saveAdminApp(){
   const sel=$('admin-cand-sel-app'); const idx=parseInt(sel?.value); if(isNaN(idx)) return;
   const c=candidates[idx];
   const newApp={q1:$('aed-q1').value, q2:$('aed-q2').value, q3:$('aed-q3').value, q4:$('aed-q4').value, q5:$('aed-q5').value, q6:$('aed-q6').value};
-  c.application = newApp;
+  const newApplyJob = $('aed-applyJob').value.trim();
+  const applyJobChanged = newApplyJob !== (c.applyJob||'');
 
-  /* ① Supabase에 저장 → Realtime으로 모든 클라이언트 반영 */
+  /* 메모리 반영 */
+  c.application = newApp;
+  if (newApplyJob) c.applyJob = newApplyJob;
+
+  /* ① Supabase에 저장 → 면접관 화면 자동 반영 */
   try {
-    const { error } = await _sb.from('employees').update({ application: newApp }).eq('sabun', c.sabun);
+    const updatePayload = { application: newApp };
+    if (newApplyJob) updatePayload.applyJob = newApplyJob;
+    const { error } = await _sb.from('employees').update(updatePayload).eq('sabun', c.sabun);
     if (error) throw new Error(error.message || 'DB 오류');
   } catch(e) { console.warn('Supabase saveApp 실패', String(e?.message||e)); }
 
@@ -4814,10 +4834,25 @@ async function saveAdminApp(){
     if (openIdx === curIdx) renderCandidate(curIdx);
   }
 
-  /* ③ 관리자 목록 지원서 유무 배지 갱신 */
+  /* ③ 관리자 목록 + 드롭다운 갱신 */
   renderAdminList();
 
-  showAdminToast('✅ 지원서가 저장되었습니다 · 면접관 화면에 자동 반영됩니다');
+  /* ④ 직무급 변경 시 드롭다운 텍스트·기본정보 패널 셀렉트도 갱신 */
+  if (applyJobChanged) {
+    ['admin-cand-sel-info','admin-cand-sel-app','admin-cand-sel-map'].forEach(id=>{
+      const el=$(id); if(!el) return;
+      [...el.options].forEach(opt=>{
+        if(opt.value===String(idx)) opt.textContent=`${c.name} (${c.sabun}) — ${c.applyJob}`;
+      });
+    });
+    /* 사이드바(면접관 뷰) 갱신 */
+    if (typeof renderSidebar === 'function') renderSidebar();
+  }
+
+  const msg = applyJobChanged
+    ? `✅ 지원 직무급(→ ${c.applyJob})과 지원서가 저장되었습니다 · 면접관 화면에 자동 반영됩니다`
+    : '✅ 지원서가 저장되었습니다 · 면접관 화면에 자동 반영됩니다';
+  showAdminToast(msg);
 }
 function loadAdminMap(){
   const sel=$('admin-cand-sel-map'); const idx=parseInt(sel?.value);
